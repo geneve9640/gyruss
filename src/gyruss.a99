@@ -1,4 +1,4 @@
-* Unused
+       aorg >2000
 
 * Center of projection
 center_of_projection:                  ; >7000
@@ -774,6 +774,8 @@ _801b:                                 ; >801b
 * NMI
 _8021:                                 ; >8021
        b    @interrupt_routine         ; JP $8501          ; Interrupt routine
+
+       aorg >a000
 
 * Entry point
 entry:                                 ; >8024
@@ -8471,15 +8473,3 @@ _bfc9:                                 ; >bfc9
        movb a,*ix                      ; LD (IX+$00),A     ; Set byte 0
        .pop ix                         ; POP IX            ; 
        .ret                            ; RET               ; 
-
-* Unused
-       byte >FF,>FF,>FF,>FF,>FF,>FF,>FF,>FF
-       byte >FF,>FF,>FF,>FF,>FF,>FF,>FF,>FF
-       byte >FF,>FF,>FF,>FF,>FF,>FF,>FF,>FF
-       byte >FF,>FF,>FF,>FF,>FF,>FF,>FF,>FF
-       byte >FF,>FF,>FF,>FF,>FF,>FF,>FF,>FF
-       byte >FF,>FF,>FF,>FF,>FF,>FF,>FF,>00
-       byte >FF
-
-* Unused
-       bss 16384

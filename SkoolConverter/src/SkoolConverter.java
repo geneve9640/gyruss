@@ -105,9 +105,7 @@ public class SkoolConverter {
                 case Directive:
                     break;
                 case Comment:
-                    if (z80Line.getAddress() >= startAddress && z80Line.getAddress() < endAddress) {
-                        tms9900Lines.add(new TMS9900Line(TMS9900Line.Type.Comment, z80Line.getComment()));
-                    }
+                    tms9900Lines.add(new TMS9900Line(TMS9900Line.Type.Comment, z80Line.getComment()));
                     break;
                 case ContinuationComment:
                     int j = i;
