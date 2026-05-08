@@ -1,4 +1,5 @@
        copy "main-code.a99"
+       copy "sound.a99"
        copy "cv-routines.a99"
        copy "ti-routines.a99"
 

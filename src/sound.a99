@@ -1,0 +1,1111 @@
+* Init sound
+*
+* Used by the routine at #R$8024.
+init_sound:                            ; >9ade
+       .call @turn_off_sound           ; CALL $1FD6        ; TURN_OFF_SOUND
+       li   hl,tune_data_buffer_1      ; LD HL,$727D       ; First tune data buffer
+       li   de,>000a                   ; LD DE,$000A       ; Size of tune data
+       mov  hl,@ptr_psg_noise_data     ; LD ($7270),HL     ; Set to #R$727D
+       a    de,hl                      ; ADD HL,DE         ;
+       mov  hl,@ptr_psg_tone_1_data    ; LD ($7272),HL     ; Set to #R$7287
+       a    de,hl                      ; ADD HL,DE         ;
+       mov  hl,@ptr_psg_tone_2_data    ; LD ($7274),HL     ; Set to #R$7291
+       a    de,hl                      ; ADD HL,DE         ;
+       mov  hl,@ptr_psg_tone_3_data    ; LD ($7276),HL     ; Set to #R$729B
+       movb @bytes+>04,b               ; LD B,$04          ; 4 channels
+       li   ix,tune_data_buffer_1      ; LD IX,$727D       ; First tune data buffer
+_9afc:                                 ; >9afc
+       movb @b255,*ix                  ; LD (IX+$00),$FF   ; Disable
+       movb @bytes+>50,@>06(ix)        ; LD (IX+$06),$50   ; Attenuation
+       movb @bytes+>05,@>08(ix)        ; LD (IX+$08),$05   ; Speed (lower is faster)
+       a    de,ix                      ; ADD IX,DE         ; Next channel
+       sb   one,b                      ; DJNZ $9AFC        ; Loop for 4 channels
+       jne  _9afc                      ;
+       .ret                            ; RET               ;
+
+* Play tune
+*
+* Used by the routines at #R$9BD9, #R$9C1C and #R$9E91.
+*
+* I:A Index of tune (0 - 6)
+play_tune:                             ; >9b0d
+       cb   a,@bytes+>07               ; CP $07            ; If tune index is 7
+       jeq  _9b19                      ; JR Z,$9B19        ; Then skip ahead
+       movb a,@tune_playing            ; LD ($727C),A      ; Else save tune index
+       li   hl,tune_data_buffer_1+>0007 ; LD HL,$7284       ; #R$727D+7
+       movb @bytes+>02,*hl             ; LD (HL),$02       ; Set to 2
+_9b19:                                 ; >9b19
+       sla  a,1                        ; RLCA              ; TODO: check code. Multiply index by 8
+       sla  a,1                        ; RLCA              ; TODO: check code. ...
+       sla  a,1                        ; RLCA              ; TODO: check code. ...
+       movb a,@e                       ; LD E,A            ; DE = A
+       sb   d,d                        ; LD D,$00          ; ...
+       li   hl,tune_data_table         ; LD HL,$9EEA       ; Table base address
+       a    de,hl                      ; ADD HL,DE         ; Add offset
+       li   ix,tune_data_buffer_1      ; LD IX,$727D       ; First tune data buffer
+       movb @bytes+>04,b               ; LD B,$04          ; 4 channels
+       movb @bytes+>0a,@e              ; LD E,$0A          ; 10 bytes each
+_9b2b:                                 ; >9b2b
+       movb *hl,a                      ; LD A,(HL)         ; Get LSB
+       movb a,@>01(ix)                 ; LD (IX+$01),A     ; Store in tune data buffer
+       inc  hl                         ; INC HL            ; Next table address
+       movb *hl,a                      ; LD A,(HL)         ; Get MSB
+       movb a,@>02(ix)                 ; LD (IX+$02),A     ; Store in tune data buffer
+       movb one,@>05(ix)               ; LD (IX+$05),$01   ; Set countdown
+       inc  hl                         ; INC HL            ; Next table address
+       sb   @>09(ix),@>09(ix)          ; LD (IX+$09),$00   ; Countdown for relative jumps
+       a    de,ix                      ; ADD IX,DE         ; Next channel
+       sb   one,b                      ; DJNZ $9B2B        ; Loop for 4 channels
+       jne  _9b2b                      ;
+       movb @bytes+>05,a               ; LD A,$05          ; Tune speed?
+       movb a,@sound_player_countdown  ; LD ($727B),A      ; Init countdown
+       movb a,@is_tune_playing         ; LD ($727A),A      ; Set a tune is playing
+       movb @tune_playing,a            ; LD A,($727C)      ; Get tune index
+       sb   one,a                      ; DEC A             ; Minus 1
+       jeq  _9b54                      ; JR Z,$9B54        ; If tune index was 1 then skip ahead and set C = 9
+       jlt  !                          ; RET P             ; If tune index was > 1 then return
+       .ret                            ;
+!
+       movb @bytes+>05,@c              ; LD C,$05          ; Set C = 5 (sound index)
+       jmp  _9b56                      ; JR $9B56          ; Skip next
+_9b54:                                 ; >9b54
+       movb @bytes+>09,@c              ; LD C,$09          ; Set C = 9 (sound index)
+_9b56:                                 ; >9b56
+       b    @play_sound_no_checks      ; JP $9CB5          ; Play sound
+
+* Increase attenuation for all tune channels
+*
+* Used by the routine at #R$9B99.
+dampen_all_tune_channels:              ; >9b59
+       li   ix,tune_data_buffer_1      ; LD IX,$727D       ; First tune data data buffer
+       movb @bytes+>04,b               ; LD B,$04          ; 4 channels
+       li   de,>000a                   ; LD DE,$000A       ; Size of sound data
+       movb @tune_playing,a            ; LD A,($727C)      ; Get tune index
+       cb   a,@bytes+>03               ; CP $03            ; If < 3
+       jl   _9b70                      ; JR C,$9B70        ; Then skip ahead
+       movb @b255,a                    ; LD A,$FF          ; Else set first byte
+       movb a,@tune_data_buffer_1      ; LD ($727D),A      ; of buffer to $FF (mute)
+       jmp  _9b82                      ; JR $9B82          ; and skip first channel
+_9b70:                                 ; >9b70
+       movb @>07(ix),a                 ; LD A,(IX+$07)     ; Get countdown for when to increase attenuation
+       sb   one,a                      ; DEC A             ; and decrement
+       jgt  !                          ; JP M,$9B82        ; If it was 0 then move to next channel
+       b    @_9b82                     ;
+!
+       movb a,@>07(ix)                 ; LD (IX+$07),A     ; Else save new value
+       movb @>04(ix),a                 ; LD A,(IX+$04)     ; Get attenuation in bits 4-7
+       ab   @bytes+>10,a               ; ADD A,$10         ; Add 1
+       movb a,@>04(ix)                 ; LD (IX+$04),A     ; Save again
+_9b82:                                 ; >9b82
+       a    de,ix                      ; ADD IX,DE         ; Next channel
+       sb   one,b                      ; DJNZ $9B70        ; Loop for 4 channels
+       jne  _9b70                      ;
+       .ret                            ; RET               ;
+
+* Stop tune
+*
+* Used by the routines at #R$8139, #R$832A and #R$9C1C.
+stop_tune:                             ; >9b87
+       sb   a,a                        ; XOR A             ;
+       movb a,@is_tune_playing         ; LD ($727A),A      ; Set tune playing flag to 0
+       sb   one,a                      ; DEC A             ; $FF
+       movb a,@tune_data_buffer_1      ; LD ($727D),A      ; Disable channel 1
+       movb a,@tune_data_buffer_2      ; LD ($7287),A      ; Disable channel 2
+       movb a,@tune_data_buffer_3      ; LD ($7291),A      ; Disable channel 3
+       movb a,@tune_data_buffer_4      ; LD ($729B),A      ; Disable channel 4
+       .ret                            ; RET               ;
+
+* Sound player
+*
+* Used by the routine at #R$8522.
+sound_player:                          ; >9b99
+       .call @all_channels_data_to_psg ; CALL $A2BB        ; Send data for all channels to PSG
+       .call @execute_sound_fx_commands ; CALL $9D67        ; Execute commands for all sound fx channels
+       movb @is_tune_playing,a         ; LD A,($727A)      ; Is tune playing?
+       ; AND A                         ; AND A             ; TODO: check code. ...
+       jne  !                          ; RET Z             ; Return is not
+       .ret                            ;
+!
+       .call @dampen_all_tune_channels ; CALL $9B59        ; Dampen all tune channels
+       li   hl,sound_player_countdown  ; LD HL,$727B       ; Decrement overall countdown
+       sb   one,*hl                    ; DEC (HL)          ; ...
+       jeq  !                          ; RET NZ            ; Return if not 0
+       .ret                            ;
+!
+       movb @bytes+>05,*hl             ; LD (HL),$05       ; Reset countdown
+* This entry point is used by the routine at #R$9BD9.
+_9bae:                                 ; >9bae
+       li   ix,tune_data_buffer_1      ; LD IX,$727D       ; First tune data buffer
+       movb @bytes+>04,b               ; LD B,$04          ; 4 channels
+       movb @tune_playing,a            ; LD A,($727C)      ; Get tune index
+       cb   a,@bytes+>03               ; CP $03            ; If < 3
+       jl   process_tune_byte          ; JR C,$9C1C        ; Then jump to the standard handler code
+* Special processing when tune index >= 3
+       sb   one,@>05(ix)               ; DEC (IX+$05)      ; Decrement countdown for channel
+       jne  _9c06                      ; JR NZ,$9C06       ; If not 0 then jump ahead and return into standard code
+* A countdown of 0 when tune index >= 3 would take us here
+       movb @bytes+>04,@>05(ix)        ; LD (IX+$05),$04   ; Reset countdown to 4 instead of 5
+       movb @>01(ix),@l                ; LD L,(IX+$01)     ; Get tune address LSB
+       movb @>02(ix),h                 ; LD H,(IX+$02)     ; Get tune address MSB
+* This entry point is used by the routines at #R$9BD9 and #R$9BF8.
+_9bca:                                 ; >9bca
+       movb *hl,a                      ; LD A,(HL)         ; Get tune byte
+       inc  hl                         ; INC HL            ; Next tune address (always points to next)
+       ; AND A                         ; AND A             ; TODO: check code. Was the byte zero?
+       jne  _9bfd                      ; JR NZ,$9BFD       ; If not, jump ahead
+       movb *hl,a                      ; LD A,(HL)         ; Get next tune byte
+       inc  hl                         ; INC HL            ; Next tune address
+       ; AND A                         ; AND A             ; TODO: check code. Was the byte zero?
+       jne  _9bd9                      ; JR NZ,$9BD9       ; If not, jump ahead
+* Two zeros only appear at the end of #R$A299
+       li   hl,tune_data_24            ; LD HL,$A299       ; Jump back and repeat with #R$A299
+       jmp  _9bca                      ; JR $9BCA          ; ...
+
+* Handle frequency byte when tune index >= 3
+*
+* Used by the routine at #R$9B99.
+_9bd9:                                 ; >9bd9
+       jlt  !                          ; JP P,$9BF8        ; If > 0 then jump ahead to loop
+       b    @_9bf8                     ;
+!
+       andi a,>7f00                    ; AND $7F           ; Negative - clear sign
+       jeq  _9bf1                      ; JR Z,$9BF1        ; If bit 7 was
+       movb a,@e                       ; LD E,A            ; Save value
+       movb @tune_playing,a            ; LD A,($727C)      ; Get tune playing
+       cb   a,@bytes+>05               ; CP $05            ; If not 5
+       jne  _9bca                      ; JR NZ,$9BCA       ; Then jump back into #R$9B99
+       movb @e,a                       ; LD A,E            ; Restore value
+       sb   one,a                      ; DEC A             ; Decrement value
+       jeq  _9bf1                      ; JR Z,$9BF1        ; If it was 1 then skip ahead
+       sb   one,@>07(ix)               ; DEC (IX+$07)      ; Decrement countdown
+       jeq  _9bca                      ; JR Z,$9BCA        ; If zero then jump back into #R$9B99
+_9bf1:                                 ; >9bf1
+       ab   @bytes+>06,a               ; ADD A,$06         ; Add 6 to get tune index
+       .call @play_tune                ; CALL $9B0D        ; Play tune
+       jmp  _9bae                      ; JR $9BAE          ;
+
+* Relative jump then  tune index >= 3
+*
+* When tune index >= 3 Used by the routine at #R$9BD9.
+_9bf8:                                 ; >9bf8
+       .call @update_counter_and_loop  ; CALL $9C92        ; Update counter and loop tune
+       jmp  _9bca                      ; JR $9BCA          ; Jump back into #R$9B99
+
+* Handle duration byte when tune index >= 3
+*
+* When tune index >= 3 Used by the routine at #R$9B99.
+_9bfd:                                 ; >9bfd
+       movb a,@>03(ix)                 ; LD (IX+$03),A     ; Save tune byte in frequency LSB
+       movb @l,@>01(ix)                ; LD (IX+$01),L     ; Set tune address LSB
+       movb h,@>02(ix)                 ; LD (IX+$02),H     ; Set tune address MSB
+* This entry point is used by the routine at #R$9B99.
+_9c06:                                 ; >9c06
+;       sb   a,a                        ; XOR A             ; Clear A
+;       sla  @>03(ix),1                 ; SLA (IX+$03)      ; Shift frequency bit 7 into carry
+;       sla  a,1                        ; RLA               ; TODO: check code. Shift carry into A bit 0
+;       sla  @>03(ix),1                 ; SLA (IX+$03)      ; Shift frequency bit 7 into carry
+;       sla  a,1                        ; RLA               ; TODO: check code. Shift carry into A bit 0
+       movb @>03(ix),a
+       srl  a,6
+       sb   one,a                      ; DEC A             ; -1, so that a zero will mute
+       movb a,*ix                      ; LD (IX+$00),A     ; Save as tune/mute byte
+       socb @bytes+>74,a               ; OR $74            ; 000000FF OR 01110100 -> 011101FF
+       movb a,@>04(ix)                 ; LD (IX+$04),A     ; Save in attenuation/frequency
+       jmp  next_tune_data_buffer      ; JR $9C8A          ; Next tune data buffer
+
+* Process tune byte
+*
+* Used by the routines at #R$9B99 and #R$9C7E.
+process_tune_byte:                     ; >9c1c
+       sb   one,@>05(ix)               ; DEC (IX+$05)      ; Decrement countdown
+       jne  next_tune_data_buffer      ; JR NZ,$9C8A       ; If not 0 then next tune data buffer
+       movb @>01(ix),@l                ; LD L,(IX+$01)     ; Get tune address LSB
+       movb @>02(ix),h                 ; LD H,(IX+$02)     ; Get tune address MSB
+* This entry point is used by the routines at #R$9C39 and #R$9C46.
+_9c27:                                 ; >9c27
+       movb *hl,a                      ; LD A,(HL)         ; Get tune byte (duration)
+       inc  hl                         ; INC HL            ; Next tune address (always points to next)
+       ; AND A                         ; AND A             ; TODO: check code. Was the byte zero?
+       jne  process_abs_rel_jump       ; JR NZ,$9C39       ; If not then jump ahead
+       .call @stop_tune                ; CALL $9B87        ; Stop tune
+       movb @tune_playing,a            ; LD A,($727C)      ; Get tune index
+       ; AND A                         ; AND A             ; TODO: check code. Return if not zero
+       jeq  !                          ; RET NZ            ; ...
+       .ret                            ;
+!
+       movb @bytes+>03,a               ; LD A,$03          ; Play tune #3
+       b    @play_tune                 ; JP $9B0D          ; ...
+
+* Handle absolute or relative jump
+*
+* Used by the routine at #R$9C1C.
+process_abs_rel_jump:                  ; >9c39
+       jlt  !                          ; JP P,$9C4B        ; If bit 7 is not set, then jump ahead
+       b    @_9c4b                     ;
+!
+* Duration byte has bit 7 set
+       andi a,>7f00                    ; AND $7F           ; Clear bit 7
+       jne  _9c46                      ; JR NZ,$9C46       ; If it wasn't $80 then jump ahead
+* Duration byte is $80: absolute jump
+       movb *hl,@e                     ; LD E,(HL)         ; Get address from tune data
+       inc  hl                         ; INC HL            ; ...
+       movb *hl,d                      ; LD D,(HL)         ; ...
+       .ex_de_hl                       ; EX DE,HL          ; HL = next address
+       jmp  _9c27                      ; JR $9C27          ; Jump to check if finished
+
+* Relative jump then check finished
+*
+* Used by the routine at #R$9C39.
+_9c46:                                 ; >9c46
+       .call @update_counter_and_loop  ; CALL $9C92        ; Handle relative jump
+       jmp  _9c27                      ; JR $9C27          ; Jump to check if finished
+
+* Process normal duration and frequency
+*
+* Used by the routine at #R$9C39.
+_9c4b:                                 ; >9c4b
+       movb a,@>05(ix)                 ; LD (IX+$05),A     ; Set countdown to duration
+       movb *hl,a                      ; LD A,(HL)         ; Get tune byte (frequency)
+       inc  hl                         ; INC HL            ; Next tune address
+       movb a,*ix                      ; LD (IX+$00),A     ; Set tone/mute to tune byte
+       movb @l,@>01(ix)                ; LD (IX+$01),L     ; Set tune address LSB
+       movb h,@>02(ix)                 ; LD (IX+$02),H     ; Set tune address MSB
+       cb   a,@b255                    ; CP $FF            ; Is it mute?
+       jeq  next_tune_data_buffer      ; JR Z,$9C8A        ; Then next tune data buffer
+       andi a,>3f00                    ; AND $3F           ; Isolate bits 0-5 for table lookup
+       movb a,@e                       ; LD E,A            ; DE = A
+       sb   d,d                        ; LD D,$00          ; ...
+       li   hl,frequency_table         ; LD HL,$9EB6       ; Table base address
+       a    de,hl                      ; ADD HL,DE         ; Add offset
+       movb *hl,a                      ; LD A,(HL)         ; Get table byte
+       movb a,@>03(ix)                 ; LD (IX+$03),A     ; Set as frequency LSB
+       movb *ix,a                      ; LD A,(IX+$00)     ; Get saved tune byte
+       andi a,>c000                    ; AND $C0           ; Isolate bits 6-7
+       sla  a,1                        ; RLCA              ; TODO: check code. Shift into bits 0-1
+       sla  a,1                        ; RLCA              ; TODO: check code. ...
+       movb a,@e                       ; LD E,A            ; Save in E
+       movb @tune_playing,a            ; LD A,($727C)      ; Get tune playing
+       cb   a,@bytes+>06               ; CP $06            ; Is it 6?
+       movb @e,a                       ; LD A,E            ; Get value back in A
+       jne  _9c7e                      ; JR NZ,$9C7E       ; Jump if tune not 6
+       socb @bytes+>a0,a               ; OR $A0            ; Apply special attenuation for tune 6
+       jmp  _9c87                      ; JR $9C87          ; Skip reset countdown (?) and skip fetch attenuation
+
+* End of processing sound channel
+*
+* Used by the routine at #R$9C4B.
+_9c7e:                                 ; >9c7e
+       movb @>08(ix),@e                ; LD E,(IX+$08)     ; Copy byte 8 (speed) to countdown
+       movb @e,@>07(ix)                ; LD (IX+$07),E     ; ...
+       socb @>06(ix),a                 ; OR (IX+$06)       ; Get attenuation from byte 6
+* This entry point is used by the routine at #R$9C4B.
+_9c87:                                 ; >9c87
+       movb a,@>04(ix)                 ; LD (IX+$04),A     ; Save in attenuation/frequency
+* This entry point is used by the routines at #R$9BFD, #R$9C1C and #R$9C4B.
+next_tune_data_buffer:                 ; >9c8a
+       li   de,>000a                   ; LD DE,$000A       ; Next tune data buffer
+       a    de,ix                      ; ADD IX,DE         ; ...
+       sb   one,b                      ; DJNZ $9C1C        ; Loop for 4 channels
+       jne  process_tune_byte          ;
+       .ret                            ; RET               ;
+
+* Handle relative jump
+*
+* Used by the routines at #R$9BF8 and #R$9C46.
+update_counter_and_loop:               ; >9c92
+       movb a,@e                       ; LD E,A            ; Save tune byte
+       movb @>09(ix),a                 ; LD A,(IX+$09)     ; Get countdown
+       ; AND A                         ; AND A             ; TODO: check code. Was it zero?
+       jeq  relative_jump              ; JR Z,$9CA0        ; Then set it and make relative jump
+       sb   one,@>09(ix)               ; DEC (IX+$09)      ; Else decrement countdown
+       jne  _9ca3                      ; JR NZ,$9CA3       ; If not zero then make relative jump
+       inc  hl                         ; INC HL            ; Else next tune address
+       .ret                            ; RET               ;
+
+* Make a relative jump
+*
+* Used by the routine at #R$9C92.
+relative_jump:                         ; >9ca0
+       movb @e,@>09(ix)                ; LD (IX+$09),E     ; Set countdown to tune byte
+* This entry point is used by the routine at #R$9C92.
+_9ca3:                                 ; >9ca3
+       movb *hl,@e                     ; LD E,(HL)         ; Get tune byte (negative jump offset)
+       movb @b255,d                    ; LD D,$FF          ; Set MSB of offset
+       a    de,hl                      ; ADD HL,DE         ; Add offset to address
+       .ret                            ; RET               ;
+
+* Play sound FX
+*
+* Used by the routine at #R$9EA3.
+*
+* I:C Index of sound (1-9), maybe 1 is no sound?
+play_sound:                            ; >9ca8
+       movb @tune_playing,a            ; LD A,($727C)      ; Get tune playing
+       ; AND A                         ; AND A             ; TODO: check code. If zero
+       jne  !                          ; RET Z             ; Then return
+       .ret                            ;
+!
+       cb   a,@bytes+>06               ; CP $06            ; Are we playing tune 6?
+       jeq  play_sound_no_checks       ; JR Z,$9CB5        ; Then skip ahead
+       movb @c,a                       ; LD A,C            ; A = index of sound
+       cb   a,@bytes+>02               ; CP $02            ; Is it < 2?
+       jhe  !                          ; RET C             ; Then return
+       .ret                            ;
+!
+* This entry point is used by the routines at #R$9B54 and #R$9E01.
+play_sound_no_checks:                  ; >9cb5
+       equ  $
+       movb @c,a                       ; LD A,C            ; A = index of sound
+       .push af                        ; PUSH AF           ; Save index
+       .call @_9cbf                    ; CALL $9CBF        ; Call next routine
+       .pop af                         ; POP AF            ; Restore index
+       cb   a,@bytes+>09               ; CP $09            ; Is it 9? (if called from play_tune or #R$9E45)
+       jeq  !                          ; RET NZ            ; Return if not
+       .ret                            ;
+!
+       ab   one,a                      ; INC A             ; Index + 1 (now 10) (continue into #R$9CBF)
+
+* Copy data from #R$9CE7 to sound fx channel, and change pointer from sound
+* data to sound fx data
+*
+* Used by the routine at #R$9CA8.
+*
+* label=init_play_sound_fx
+_9cbf:                                 ; >9cbf
+       sla  a,1                        ; RLCA              ; TODO: check code. Multiply by 8
+       sla  a,1                        ; RLCA              ; TODO: check code. ...
+       sla  a,1                        ; RLCA              ; TODO: check code. ...
+       movb a,@e                       ; LD E,A            ; DE = A
+       sb   d,d                        ; LD D,$00          ; ...
+       li   hl,sound_fx_data_table     ; LD HL,$9CE7       ; Table address
+       a    de,hl                      ; ADD HL,DE         ; Add offset
+       movb *hl,a                      ; LD A,(HL)         ; Get table byte
+       sla  a,1                        ; RLCA              ; TODO: check code. Multiply by 2
+       .push af                        ; PUSH AF           ; Save it
+       sla  a,1                        ; RLCA              ; TODO: check code. Multiply by 4 more
+       sla  a,1                        ; RLCA              ; TODO: check code. ...
+       movb a,@c                       ; LD C,A            ; BC = A
+       movb d,b                        ; LD B,D            ; ...
+       .ex_de_hl                       ; EX DE,HL          ; DE = table address
+       li   hl,sound_fx_data_buffer_1  ; LD HL,$72A5       ; HL = Sound fx data 1
+       a    bc,hl                      ; ADD HL,BC         ; Add offset
+       .push hl                        ; PUSH HL           ; Save sound fx data address
+       .ex_de_hl                       ; EX DE,HL          ; HL = table address, DE = sound fx data address
+       li   bc,>0008                   ; LD BC,$0008       ; Copy 8 bytes from #R$9CE7 to sound fx data
+       .ldir                           ; LDIR              ; ...
+       .pop de                         ; POP DE            ; DE = sound fx data address
+       .pop af                         ; POP AF            ; A = table byte * 2
+       movb a,@c                       ; LD C,A            ; BC = A
+       li   hl,ptr_psg_noise_data      ; LD HL,$7270       ; First pointer
+       a    bc,hl                      ; ADD HL,BC         ; Add offset
+_9ce3:                                 ; >9ce3
+       movb @e,*hl                     ; LD (HL),E         ; Set pointer LSB
+       inc  hl                         ; INC HL            ; Next address
+       movb d,*hl                      ; LD (HL),D         ; Set pointer MSB
+       .ret                            ; RET               ;
+
+* Sound fx data
+*
+* Byte 0 in each row is the channel. Rows are copied into the corresponding
+* sound fx data buffer.
+* #TABLE(default, default)
+* { =h Index | =h Played when }
+* { $00 | None }
+* { $01 | Shot hit center enemy }
+* { $02 | New wave }
+* { $03 | Explosion }
+* { $04 | Shot hit enemy }
+* { $05 | Stage completed }
+* { $06 | Extra life }
+* { $07 | Mines appear, ship appear }
+* { $08 | Shot hit mine }
+* { $09 | Part of tune }
+* { $0A | None }
+* TABLE#
+sound_fx_data_table:                   ; >9ce7
+       byte >00,>00,>00,>00,>26,>80,>00,>00
+       byte >02,>00,>00,>40,>41,>81,>40,>00
+       byte >03,>00,>00,>70,>51,>82,>00,>00
+       byte >00,>00,>00,>00,>00,>83,>00,>00
+       byte >02,>00,>00,>80,>41,>84,>80,>00
+       byte >03,>DC,>00,>80,>80,>85,>C0,>03
+       byte >00,>00,>00,>00,>48,>86,>00,>00
+       byte >00,>00,>00,>FC,>F0,>87,>00,>00
+       byte >03,>40,>00,>80,>80,>88,>F0,>01
+       byte >03,>00,>00,>00,>F0,>89,>00,>00
+       byte >00,>00,>00,>00,>87,>8A
+
+* Sound fx done
+*
+* Reset sound data pointer to point to sound data rather than fx data. Also
+* sets sound fx data command to 0. Used by the routines at #R$9E75.
+*
+* I:A Channel
+sound_fx_done:                         ; >9d3d
+       sla  a,1                        ; RLCA              ; TODO: check code. Multiply channel by 2
+       movb a,@c                       ; LD C,A            ; Store word offset in C
+       sla  a,1                        ; RLCA              ; TODO: check code. Multiply by 4
+       sla  a,1                        ; RLCA              ; TODO: check code. Multiply by 8
+       movb a,@e                       ; LD E,A            ; DE = A
+       sb   d,d                        ; LD D,$00          ; ...
+       li   iy,sound_fx_data_buffer_1  ; LD IY,$72A5       ; Sound fx data 1
+       a    de,iy                      ; ADD IY,DE         ; Add offset
+       movb @>05(iy),a                 ; LD A,(IY+$05)     ; Get command (not used?)
+       movb d,@>05(iy)                 ; LD (IY+$05),D     ; Set command to 0
+       movb @c,@e                      ; LD E,C            ; Word offset (channel * 2)
+       li   iy,ptr_psg_noise_data      ; LD IY,$7270       ; First pointer
+       a    de,iy                      ; ADD IY,DE         ; Add offset (IY now points to a pointer)
+       movb @c,a                       ; LD A,C            ; Word offset
+       sla  a,1                        ; RLCA              ; TODO: check code. Multiply by 2
+       sla  a,1                        ; RLCA              ; TODO: check code. Multiply by 4
+       ab   @c,a                       ; ADD A,C           ; Multiply by 5, i.e. channel * 10
+       movb a,@e                       ; LD E,A            ; DE = A
+       li   hl,tune_data_buffer_1      ; LD HL,$727D       ; Sound data base
+       a    de,hl                      ; ADD HL,DE         ; Add offset
+       movb @l,*iy                     ; LD (IY+$00),L     ; Update pointer with sound data address
+       movb h,@>01(iy)                 ; LD (IY+$01),H     ; ...
+       .ret                            ; RET               ;
+
+* Execute commands for all sound fx channels
+*
+* Used by the routine at #R$9B99.
+execute_sound_fx_commands:             ; >9d67
+       li   ix,sound_fx_data_buffer_4  ; LD IX,$72BD       ; Sound fx data 4 (start at the end)
+       movb @bytes+>04,b               ; LD B,$04          ; 4 channels
+* This entry point is used by the routine at #R$9D89.
+_9d6d:                                 ; >9d6d
+       movb @>05(ix),a                 ; LD A,(IX+$05)     ; Get index of sound command to call
+       ; AND A                         ; AND A             ; TODO: check code. Test bits and clear carry
+       jlt  !                          ; JP P,$9D89        ; Skip channel if bit 7 is reset
+       b    @_9d89                     ;
+!
+       sla  a,1                        ; RLA               ; TODO: check code. Multiply by 2, and shift out bit 7
+       movb a,@e                       ; LD E,A            ; DE = A
+       sb   d,d                        ; LD D,$00          ; ...
+       li   iy,sound_fx_command_jump_table ; LD IY,$9D91       ; Base address of jump table
+       a    de,iy                      ; ADD IY,DE         ; Add offset
+       movb *iy,@l                     ; LD L,(IY+$00)     ; Get LSB
+       movb @>01(iy),h                 ; LD H,(IY+$01)     ; Get MSB
+       li   de,_9d89                   ; LD DE,$9D89       ; Return address
+       .push de                        ; PUSH DE           ; Push return address on stack
+       b    *hl                        ; JP (HL)           ; TODO.
+_9d89:                                 ; >9d89
+       li   de,>fff8                   ; LD DE,$FFF8       ; -8
+       a    de,ix                      ; ADD IX,DE         ; Move 8 bytes back
+       sb   one,b                      ; DJNZ $9D6D        ; Loop for 4 channels
+       jne  _9d6d                      ;
+sound_fx_command_10:                   ; >9d90
+       .ret                            ; RET               ;
+
+* Sound command jump table
+sound_fx_command_jump_table:           ; >9d91
+       data sound_fx_command_0
+       data sound_fx_command_1_4
+       data sound_fx_command_2
+       data sound_fx_command_3
+       data sound_fx_command_1_4
+       data sound_fx_command_5_8
+       data sound_fx_command_6
+       data sound_fx_command_7
+       data sound_fx_command_5_8
+       data sound_fx_command_9
+       data sound_fx_command_10
+
+* Sound FX command 3
+*
+* Noise.
+*
+* I:B Channel index + 1
+* I:IX Sound fx data
+sound_fx_command_3:                    ; >9da7
+       movb @>04(ix),a                 ; LD A,(IX+$04)     ; Get attenuation/noise control (starts with $00)
+       ab   one,a                      ; INC A             ; Increment
+       movb a,@c                       ; LD C,A            ; And save
+       andi a,>0f00                    ; AND $0F           ; Test if bits 0-3 were 0
+       movb @c,a                       ; LD A,C            ; Restore incremented value
+       jne  _9db5                      ; JR NZ,$9DB5       ; If bits weren't 0 then skip next
+       ab   @bytes+>10,a               ; ADD A,$10         ; Add 1 to attenuation
+       jeq  _9dfc                      ; JR Z,$9DFC        ; If it rolled over then sound FX done
+_9db5:                                 ; >9db5
+       movb a,@>04(ix)                 ; LD (IX+$04),A     ; Save again
+       .ret                            ; RET               ;
+
+* Sound FX command 6
+*
+* Noise.
+*
+* I:B Channel index + 1
+* I:IX Sound fx data
+sound_fx_command_6:                    ; >9db9
+       movb @>04(ix),a                 ; LD A,(IX+$04)     ; Get attenuation/noise control (starts with $48)
+       ab   @bytes+>04,a               ; ADD A,$04         ; Add 4 (changes noise control?)
+       jeq  _9dfc                      ; JR Z,$9DFC        ; If it rolled over then sound FX done
+       movb a,@>04(ix)                 ; LD (IX+$04),A     ; Else save again
+       .ret                            ; RET               ;
+
+* Sound FX command 1,4
+*
+* Tone.
+*
+* I:B Channel index + 1
+* I:IX Sound fx data
+sound_fx_command_1_4:                  ; >9dc4
+       movb @>03(ix),a                 ; LD A,(IX+$03)     ; Get frequency LSB (starts at $40 or $80)
+       sb   @bytes+>0c,a               ; SUB $0C           ; Subtract 12
+       movb a,@>03(ix)                 ; LD (IX+$03),A     ; Save again
+       jlt  !                          ; RET P             ; Return if positive
+       .ret                            ;
+!
+       movb @>06(ix),a                 ; LD A,(IX+$06)     ; Get reset value (starts same as IX+$03)
+       movb a,@>03(ix)                 ; LD (IX+$03),A     ; Reset value
+       movb @bytes+>20,@c              ; LD C,$20          ; Value to increase attenuation by
+       jmp  _9df2                      ; JR $9DF2          ; Jump to increase attenuation
+
+* Sound FX command 2
+*
+* Tone.
+*
+* I:B Channel index + 1
+* I:IX Sound fx data
+sound_fx_command_2:                    ; >9dd7
+       movb @>03(ix),a                 ; LD A,(IX+$03)     ; Get frequency LSB (starts at $70)
+       ab   @bytes+>04,a               ; ADD A,$04         ; Add 4
+       movb a,@>03(ix)                 ; LD (IX+$03),A     ; Save again
+       jeq  _9dfc                      ; JR Z,$9DFC        ; If it rolled over then sound fx done
+       andi a,>0400                    ; AND $04           ; Else isolate bit 2 of frequency
+       inv  a                          ; CPL               ; Invert
+       movb a,*ix                      ; LD (IX+$00),A     ; Save in byte 0 to switch between noise and mute
+       .ret                            ; RET               ;
+
+* Sound FX command 0
+*
+* Noise.
+*
+* I:B Channel index + 1
+* I:IX Sound fx data
+sound_fx_command_0:                    ; >9de8
+       sb   one,@>03(ix)               ; DEC (IX+$03)      ; Decrement frequency LSB (starts at $00)
+       movb @>03(ix),a                 ; LD A,(IX+$03)     ; Get frequency LSB
+       srl  a,1                        ; RRA               ; TODO: check code. Shift bit 0 into carry
+       jnc  !                          ; RET C             ; TODO: check code. Return if bit 0 was set
+       .ret                            ;
+!
+       movb @bytes+>10,@c              ; LD C,$10          ;
+* This entry point is used by the routine at #R$9DC4.
+_9df2:                                 ; >9df2
+       movb @>04(ix),a                 ; LD A,(IX+$04)     ; AAAA00FF (starts at $26)
+       ab   @c,a                       ; ADD A,C           ; Add 1 to attenuation
+       movb a,@>04(ix)                 ; LD (IX+$04),A     ; Store again
+       andi a,>f000                    ; AND $F0           ; Return if attenuation has no rolled over to 0
+       jeq  !                          ; RET NZ            ; ...
+       .ret                            ;
+!
+* This entry point is used by the routines at #R$9DA7 and #R$9DC4.
+_9dfc:                                 ; >9dfc
+       equ  $
+       movb b,a                        ; LD A,B            ; Channel index + 1
+       sb   one,a                      ; DEC A             ; Channel index
+       b    @sound_fx_done             ; JP $9D3D          ; Sound fx done
+
+* Sound FX command 5,8
+*
+* Tone.
+*
+* I:B Channel index + 1
+* I:IX Sound fx data
+sound_fx_command_5_8:                  ; >9e01
+       mov  @sound_fx_data_buffer_4_34,hl ; LD HL,($72C0)     ; Get byte 3-4 of sound fx data 4, e.g. $8080
+       szcb @bits+7,h                  ; RES 7,H           ; $0080
+       mov  @sound_fx_data_buffer_4_12,de ; LD DE,($72BE)     ; Get byte 1-2 of sound fx data 4, e.g. $00DC
+       a    de,hl                      ; ADD HL,DE         ; Add them, e.g. $005C
+       movb h,a                        ; LD A,H            ; $00
+       mov  hl,@sound_fx_data_buffer_4_34 ; LD ($72C0),HL     ; Save again
+       socb @bits+7,@>04(ix)           ; SET 7,(IX+$04)    ; $80
+       cb   a,@bytes+>04               ; CP $04            ; If >= 4
+       jhe  _9e1f                      ; JR NC,$9E1F       ; Then skip ahead
+       mov  @sound_fx_data_buffer_4_67,de ; LD DE,($72C3)     ; Else get byte 6-7, e.g. $03C0
+       ; AND A                         ; AND A             ; TODO: check code. Clear carry
+       s    de,hl                      ; SBC HL,DE         ; Subtract it
+       jnc  !                          ; RET C             ; TODO: check code. Return if < 0
+       .ret                            ;
+!
+_9e1f:                                 ; >9e1f
+       equ  $
+       movb @bytes+>80,@>03(ix)        ; LD (IX+$03),$80   ; Set byte 3-4
+       movb @bytes+>80,@>04(ix)        ; LD (IX+$04),$80   ; ...
+       .ex_de_hl                       ; EX DE,HL          ;
+       li   de,>0008                   ; LD DE,$0008       ; Size of sound fx data
+       ; AND A                         ; AND A             ; TODO: check code.
+       s    de,hl                      ; SBC HL,DE         ;
+       mov  hl,@sound_fx_data_buffer_4_67 ; LD ($72C3),HL     ; Set byte 6-7
+       movb h,a                        ; LD A,H            ;
+       ; AND A                         ; AND A             ; TODO: check code.
+       jne  _9e4a                      ; JR NZ,$9E4A       ;
+       movb @l,a                       ; LD A,L            ;
+       cb   a,@bytes+>ea               ; CP $EA            ;
+       jhe  _9e4a                      ; JR NC,$9E4A       ;
+       movb @>05(ix),a                 ; LD A,(IX+$05)     ;
+       cb   a,@bytes+>85               ; CP $85            ;
+       jeq  !                          ; JP NZ,$9DFC       ; Sound FX done
+       b    @_9dfc                     ;
+!
+       movb @bytes+>09,@c              ; LD C,$09          ; Sound index
+       .push bc                        ; PUSH BC           ;
+       .call @play_sound_no_checks     ; CALL $9CB5        ; Play sound 9
+       .pop bc                         ; POP BC            ;
+       .ret                            ; RET               ;
+_9e4a:                                 ; >9e4a
+       li   de,>0080                   ; LD DE,$0080       ;
+       ; AND A                         ; AND A             ; TODO: check code.
+       s    de,hl                      ; SBC HL,DE         ;
+       srl  h,1                        ; SRL H             ; Divide HL by 4
+       ; RR L                          ; RR L              ; TODO: check code. ...
+       srl  h,1                        ; SRL H             ; ...
+       ; RR L                          ; RR L              ; TODO: check code. ...
+       mov  hl,@sound_fx_data_buffer_4_12 ; LD ($72BE),HL     ; Set byte 1-2
+       .ret                            ; RET               ;
+
+* Sound FX command 7
+*
+* Noise. When mines appear. Generates $FD, $F5, $ED, $E5, ..., and up again.
+*
+* I:B Channel index + 1
+* I:IX Sound fx data
+sound_fx_command_7:                    ; >9e5c
+       movb @>02(ix),a                 ; LD A,(IX+$02)     ; Get byte 2 (starts with $00)
+       ab   @>03(ix),a                 ; ADD A,(IX+$03)    ; Add byte 3 (starts with $FC = -4)
+       jeq  _9dfc                      ; JR Z,$9DFC        ; If zero then sound FX done
+       cb   a,@bytes+>30               ; CP $30            ; If >= $30
+       jhe  _9e6c                      ; JR NC,$9E6C       ; Then skip next
+       movb @bytes+>04,@>03(ix)        ; LD (IX+$03),$04   ; Byte 3 = 4
+_9e6c:                                 ; >9e6c
+       movb a,@>02(ix)                 ; LD (IX+$02),A     ; Byte 2 = byte 2 + byte 3 from before
+       socb @bytes+>05,a               ; OR $05            ; Set bits 0 and 3
+       movb a,@>04(ix)                 ; LD (IX+$04),A     ; Save in attenuation/noise control
+       .ret                            ; RET               ;
+
+* Sound FX command 9
+*
+* Tone (silent). Increases frequency up to $016C.
+*
+* I:B Channel index + 1
+* I:IX Sound fx data
+sound_fx_command_9:                    ; >9e75
+       ab   one,@>03(ix)               ; INC (IX+$03)      ; Increment frequency LSB (starts at $00)
+       ab   one,@>03(ix)               ; INC (IX+$03)      ; Increment frequency LSB
+       jne  _9e80                      ; JR NZ,$9E80       ; If it didn't turn over, skip ahead
+       ab   one,@>04(ix)               ; INC (IX+$04)      ; Increment frequency MSB
+_9e80:                                 ; >9e80
+       mov  @sound_fx_data_buffer_4_34,hl ; LD HL,($72C0)     ; Get attenuation/frequency of channel 4 (this channel)
+       li   de,>f16c                   ; LD DE,$F16C       ; Compare to this number
+       ; AND A                         ; AND A             ; TODO: check code. Clear carry
+       s    de,hl                      ; SBC HL,DE         ; ...
+       jeq  !                          ; RET NZ            ; And return if not the same
+       .ret                            ;
+!
+       .call @_9dfc                    ; CALL $9DFC        ; Sound fx done for this channel
+       sb   a,a                        ; XOR A             ; Sound fx done for channel 0 (played together with noise)
+       b    @sound_fx_done             ; JP $9D3D          ; ...
+
+* Call play tune, preserve registers
+*
+* Used by the routines at #R$82BF, #R$832A and #R$846B. I:A Index of tune
+call_play_tune:                        ; >9e91
+       .push bc                        ; PUSH BC           ;
+       .push de                        ; PUSH DE           ;
+       .push hl                        ; PUSH HL           ;
+       .push ix                        ; PUSH IX           ;
+       .push iy                        ; PUSH IY           ;
+       .call @play_tune                ; CALL $9B0D        ; Play tune
+       .pop iy                         ; POP IY            ;
+       .pop ix                         ; POP IX            ;
+       .pop hl                         ; POP HL            ;
+       .pop de                         ; POP DE            ;
+       .pop bc                         ; POP BC            ;
+       .ret                            ; RET               ;
+
+* Call play sound, preserve registers
+*
+* Used by the routines at #R$8139, #R$832A, #R$8C52, #R$8E9D, #R$9934, #R$99A0,
+* #R$99B1, #R$99D3, #R$A33B and #R$A6EC.
+*
+* I:A Index of sound
+call_play_sound:                       ; >9ea3
+       .push bc                        ; PUSH BC           ;
+       .push de                        ; PUSH DE           ;
+       .push hl                        ; PUSH HL           ;
+       .push ix                        ; PUSH IX           ;
+       .push iy                        ; PUSH IY           ;
+       movb a,@c                       ; LD C,A            ;
+       .call @play_sound               ; CALL $9CA8        ; Play sound
+       .pop iy                         ; POP IY            ;
+       .pop ix                         ; POP IX            ;
+       .pop hl                         ; POP HL            ;
+       .pop de                         ; POP DE            ;
+       .pop bc                         ; POP BC            ;
+       .ret                            ; RET               ;
+
+* Sound frequency table
+frequency_table:                       ; >9eb6
+       byte >35,>39,>3C,>40,>43,>47,>4C,>50
+       byte >55,>5A,>5F,>65,>6B,>71,>78,>7F
+       byte >87,>8F,>97,>A0,>AA,>B4,>BE,>CA
+       byte >D6,>E2,>F0,>FE,>0D,>1D,>2E,>40
+       byte >53,>68,>7D,>94,>AC,>C5,>E0,>FC
+       byte >1B,>3B,>5D,>81,>A7,>CF,>FA,>27
+       byte >57,>8A,>C0,>F9
+
+* Tune data
+*
+* Each row contains 4 addresses for 4 channels. Addresses are copied into byte
+* 1 and 2 of the sound data buffer.
+* #TABLE(default, default)
+* { =h Index | =h Played when }
+* { $00 | First stage }
+* { $01 | Planet reached }
+* { $02 | Perfect bonus }
+* { $03 | 2 warps to planet }
+* { $04 | 1 warp to planet }
+* { $05 | 3 warps to planet }
+* { $06 | Chance stage }
+* { $07 | Unknown }
+* TABLE#
+tune_data_table:                       ; >9eea
+       data tune_data_26,tune_data_1,tune_data_3,tune_data_5
+       data tune_data_26,tune_data_2,tune_data_4,tune_data_6
+       data tune_data_10,tune_data_7,tune_data_8,tune_data_9
+       data tune_data_14,tune_data_11,tune_data_12,tune_data_13
+       data tune_data_22,tune_data_15,tune_data_18,tune_data_20
+       data tune_data_22,tune_data_16,tune_data_18,tune_data_20
+       data tune_data_24,tune_data_26,tune_data_26,tune_data_25
+       data tune_data_23,tune_data_17,tune_data_19,tune_data_21
+
+* Tune data 1
+*
+* Tune data basically consist of pairs of 2 bytes
+* #TABLE(default, default)
+* { =h Byte offset | =h Purpose }
+* { $00 | Duration }
+* {     | If bit 7 if set, it has a special meaning: }
+* {     | 1000000: load new address from next two bytes }
+* {     | 1XXXXXX: subtract XXXXXXX from address }
+* {     | 1111111: mute channel }
+* { $01 | Frequency }
+* {     | Bits 6-7 are used directly as bits 8-9 of the PSG frequency }
+* {     | Bits 0-5 are used as index into #R$9EB6, which produces bits 0-7 of
+* the PSG frequency }
+* TABLE#
+tune_data_1:                           ; >9f2a
+       byte >02,>19,>02,>1B,>10,>19,>04,>FF
+       byte >04,>1B,>04,>5D,>04,>5E,>04,>60
+       byte >08,>61,>18,>60
+
+* Tune data 2
+tune_data_2:                           ; >9f3e
+       byte >06,>60,>06,>61,>06,>5E,>06,>1B
+       byte >06,>18,>06,>15,>0C,>12,>18,>14
+
+* Tune data 3
+tune_data_3:                           ; >9f4e
+       byte >02,>65,>02,>67,>10,>65,>04,>FF
+       byte >04,>67,>04,>A9,>04,>AA,>04,>AC
+       byte >08,>AD,>18,>AC
+
+* Tune data 4
+tune_data_4:                           ; >9f62
+       byte >0C,>64,>0C,>67,>0C,>AA,>0C,>AD
+       byte >18,>AC
+
+* Tune data 5
+tune_data_5:                           ; >9f6c
+       byte >48,>FF
+
+* Tune data 6
+tune_data_6:                           ; >9f6e
+       byte >24,>FF,>0C,>1B,>02,>5C,>02,>5E
+       byte >14,>5C,>00
+
+* Tune data 7
+tune_data_7:                           ; >9f79
+       byte >02,>15,>87,>FD,>02,>16,>87,>FD
+       byte >18,>16
+
+* Tune data 8
+tune_data_8:                           ; >9f83
+       byte >08,>61,>08,>1A,>08,>15,>20,>0E
+
+* Tune data 9
+tune_data_9:                           ; >9f8b
+       byte >08,>FF,>30,>AD
+
+* Tune data 10
+tune_data_10:                          ; >9f8f
+       byte >08,>FF,>30,>80,>00
+
+* Tune data 11
+tune_data_11:                          ; >9f94
+       byte >12,>FF,>01,>18,>01,>19,>01,>1A
+       byte >01,>1B,>01,>5C,>01,>5D,>01,>5E
+       byte >01,>5F,>01,>60,>01,>61,>01,>62
+       byte >01,>63,>01,>64,>01,>65,>02,>60
+       byte >02,>5E,>02,>5D,>02,>60,>02,>5E
+       byte >02,>5D,>02,>1B,>02,>5E,>02,>5D
+       byte >02,>1B,>02,>19,>02,>5D,>02,>1B
+       byte >02,>19,>02,>18,>02,>1B,>02,>19
+       byte >02,>5D,>02,>1B,>02,>5E,>02,>5D
+       byte >02,>60,>02,>5E,>02,>61,>02,>60
+       byte >02,>65,>01,>64,>01,>65,>02,>67
+       byte >06,>65,>02,>65,>81,>C1,>30,>FF
+       byte >10,>AC,>04,>AC,>04,>AC,>04,>AC
+       byte >04,>AC
+
+* Tune data 12
+tune_data_12:                          ; >9ffe
+       byte >12,>FF,>01,>5F,>01,>60,>01,>61
+       byte >01,>62,>01,>63,>01,>64,>01,>65
+       byte >01,>66,>01,>67,>01,>A8,>01,>A9
+       byte >01,>AA,>01,>AB,>01,>AC,>04,>65
+       byte >04,>65,>86,>FB,>08,>FF,>04,>65
+       byte >04,>65,>85,>FB,>02,>AC,>02,>65
+       byte >02,>64,>02,>67,>02,>65,>02,>A9
+       byte >02,>67,>02,>AA,>02,>A9,>02,>AC
+       byte >02,>67,>02,>AA,>02,>A9,>02,>AC
+       byte >02,>AA,>02,>AD,>81,>DF,>10,>F1
+       byte >04,>F1,>04,>F1,>04,>F1,>04,>F1
+
+* Tune data 13
+tune_data_13:                          ; >a056
+       byte >02,>AC,>02,>F1,>80,>56,>A0
+
+* Tune data 14
+tune_data_14:                          ; >a05d
+       byte >5A,>00,>07,>FD,>A9,>6A,>00,>06
+       byte >FC,>AA,>8A,>A9,>6A,>00,>10,>FC
+       byte >A9,>69,>00,>80
+
+* Tune data 15
+tune_data_15:                          ; >a071
+       byte >12,>FF,>01,>18,>01,>16,>01,>14
+       byte >01,>12,>01,>11,>01,>0F,>01,>0D
+       byte >01,>0C,>01,>0A,>01,>08,>01,>06
+       byte >01,>05,>01,>0F,>01,>0D,>80,>94
+       byte >A0
+
+* Tune data 16
+tune_data_16:                          ; >a092
+       byte >20,>FF
+
+* Tune data 17
+tune_data_17:                          ; >a094
+       byte >02,>18,>04,>18,>87,>FD,>04,>19
+       byte >87,>FD,>04,>1B,>86,>FD,>02,>1B
+       byte >02,>5D,>04,>5E,>83,>FB,>04,>5D
+       byte >04,>5E,>02,>FF,>06,>5D,>06,>5E
+       byte >06,>60,>0C,>61,>81,>F5,>02,>FF
+       byte >06,>18,>06,>19,>06,>1B,>06,>19
+       byte >81,>F7,>06,>18,>06,>19,>12,>18
+       byte >20,>19,>01,>12,>01,>0F,>01,>12
+       byte >01,>15,>83,>F7,>01,>15,>01,>12
+       byte >01,>15,>01,>18,>83,>F7,>01,>18
+       byte >01,>15,>01,>18,>01,>1B,>83,>F7
+       byte >01,>1B,>01,>18,>01,>1B,>01,>5E
+       byte >83,>F7,>01,>5E,>01,>1B,>01,>5E
+       byte >01,>61,>87,>F7,>01,>18,>01,>15
+       byte >01,>18,>01,>1B,>83,>F7,>01,>1B
+       byte >01,>18,>01,>1B,>01,>5E,>83,>F7
+       byte >01,>5E,>01,>1B,>01,>5E,>01,>61
+       byte >8B,>F7,>08,>67,>08,>AA,>10,>19
+       byte >06,>1B,>02,>19,>04,>18,>04,>1B
+       byte >10,>19,>10,>1B,>08,>1B,>04,>5D
+       byte >04,>5E,>10,>5D,>10,>5D
+
+* Tune data 18
+tune_data_18:                          ; >a13a
+       byte >04,>65,>87,>FD
+
+* Tune data 19
+tune_data_19:                          ; >a13e
+       byte >02,>60,>04,>60,>87,>FD,>04,>62
+       byte >87,>FD,>04,>64,>86,>FD,>02,>64
+       byte >02,>60,>04,>61,>83,>FB,>04,>60
+       byte >04,>61,>02,>FF,>06,>65,>06,>67
+       byte >06,>A9,>0C,>AA,>02,>FF,>06,>18
+       byte >06,>19,>06,>1B,>0C,>19,>02,>FF
+       byte >06,>5D,>06,>5E,>06,>60,>06,>61
+       byte >06,>5D,>06,>5E,>06,>60,>06,>5E
+       byte >06,>5D,>06,>5E,>12,>5D,>20,>65
+       byte >04,>67,>87,>FD,>10,>1B,>10,>5E
+       byte >10,>61,>08,>64,>08,>67,>81,>F5
+       byte >08,>AA,>08,>67,>08,>AA,>08,>AD
+       byte >04,>5D,>02,>5E,>02,>60,>08,>5D
+       byte >04,>64,>02,>65,>02,>67,>04,>60
+       byte >04,>64,>04,>AD,>04,>67,>04,>65
+       byte >04,>63,>04,>61,>04,>63,>04,>61
+       byte >04,>65,>08,>64,>04,>65,>04,>67
+       byte >10,>65,>10,>65
+
+* Tune data 20
+tune_data_20:                          ; >a1ca
+       byte >02,>AC,>02,>F1,>87,>FB
+
+* Tune data 21
+tune_data_21:                          ; >a1d0
+       byte >02,>F0,>02,>A9,>87,>FB,>02,>F1
+       byte >02,>AA,>87,>FB,>02,>F3,>02,>AC
+       byte >87,>FB,>02,>F0,>04,>F1,>83,>FB
+       byte >04,>F0,>04,>F1,>02,>FF,>06,>AC
+       byte >06,>AE,>06,>F0,>0C,>F1,>81,>F5
+       byte >02,>FF,>06,>AC,>06,>AE,>06,>F0
+       byte >06,>F1,>06,>F3,>06,>F1,>06,>F0
+       byte >06,>AE,>06,>AC,>06,>AE,>12,>AC
+       byte >20,>F1,>20,>FF,>10,>61,>10,>64
+       byte >10,>67,>08,>AA,>08,>AD,>81,>F5
+       byte >08,>F0,>08,>AD,>08,>AD,>08,>F1
+       byte >10,>AC,>10,>AC,>10,>AA,>0C,>F1
+       byte >04,>AD,>08,>AC,>08,>AC,>10,>AC
+       byte >10,>AC
+
+* Tune data 22
+tune_data_22:                          ; >a23a
+       byte >A9,>6A,>00,>03,>FC
+
+* Tune data 23
+tune_data_23:                          ; >a23f
+       byte >A9,>6A,>00,>02,>FC,>88,>A8,>A9
+       byte >6A,>00,>02,>FC,>8A,>88,>A9,>6A
+       byte >00,>02,>FC,>88,>A8,>A9,>6A,>00
+       byte >03,>FC,>00,>82,>A9,>6A,>A9,>6A
+       byte >A9,>6A,>AA,>A8,>00,>01,>F6,>A9
+       byte >6A,>00,>09,>FC,>88,>00,>04,>FD
+       byte >AA,>AA,>AA,>00,>81,>80,>00,>0F
+       byte >FD,>88,>00,>0F,>FD,>AA,>00,>0C
+       byte >FD,>88,>AA,>88,>88,>88,>8A,>88
+       byte >00,>06,>FD,>AA,>88,>88,>88,>88
+       byte >88,>8A,>88,>8A,>AA,>00,>08,>FD
+       byte >00,>80
+
+* Tune data 24
+tune_data_24:                          ; >a299
+       byte >7F,>FD,>7F,>FD,>7D,>7D,>7F,>FD
+       byte >7D,>F7,>DF,>44,>5F,>5F,>55,>44
+       byte >5F,>5F,>44,>55,>00,>00
+
+* Tune data 25
+tune_data_25:                          ; >a2af
+       byte >01,>F1,>01,>F0,>80,>AF,>A2
+
+* Tune data 26
+tune_data_26:                          ; >a2b6
+       byte >40,>FF,>80,>B6,>A2
+
+* Send data for all channels to PSG
+*
+* Used by the routine at #R$9B99.
+all_channels_data_to_psg:              ; >a2bb
+       movb @bytes+>9f,a               ; LD A,$9F          ; Mute channel 1
+       movb @bytes+>90,@c              ; LD C,$90          ; Tone 1 attenuation
+       movb @bytes+>80,d               ; LD D,$80          ; Tone 1 frequency
+       mov  @ptr_psg_tone_1_data,ix    ; LD IX,($7272)     ; IX=#R$7287
+       .call @tone_data_to_psg         ; CALL $A314        ; Play tone or mute
+       movb @bytes+>bf,a               ; LD A,$BF          ; Mute channel 2
+       movb @bytes+>b0,@c              ; LD C,$B0          ; Tone 2 attenuation
+       movb @bytes+>a0,d               ; LD D,$A0          ; Tone 2 frequency
+       mov  @ptr_psg_tone_2_data,ix    ; LD IX,($7274)     ; IX=#R$7291
+       .call @tone_data_to_psg         ; CALL $A314        ; Play tone or mute
+       movb @bytes+>df,a               ; LD A,$DF          ; Mute channel 3
+       movb @bytes+>d0,@c              ; LD C,$D0          ; Tone 3 attenuation
+       movb @bytes+>c0,d               ; LD D,$C0          ; Tone 3 frequency
+       mov  @ptr_psg_tone_3_data,ix    ; LD IX,($7276)     ; IX=#R$729B
+       .call @tone_data_to_psg         ; CALL $A314        ; Play tone or mute
+       movb @b255,a                    ; LD A,$FF          ; Mute noise
+       movb @bytes+>f0,@c              ; LD C,$F0          ; Noise attenuation
+       mov  @ptr_psg_noise_data,ix     ; LD IX,($7270)     ; IX=#R$727D
+       movb *ix,@e                     ; LD E,(IX+$00)     ; Get byte 0
+       ab   one,@e                     ; INC E             ; If it was zero
+       jne  noise_data_to_psg          ; JR NZ,$A2F3       ; Then jump ahead
+       ; OUT ($FF),A                   ; OUT ($FF),A       ; TODO: check code. Else mute
+       .ret                            ; RET               ;
+
+* Send data for noise channel to PSG
+*
+* Used by the routine at #R$A2BB.
+*
+* I:(IX+$04) Attenuation/noise control AAAAXNNN
+noise_data_to_psg:                     ; >a2f3
+       .call @attn_or_noise_to_psg     ; CALL $A303        ; Send attenuation to PSG
+       movb @>04(ix),a                 ; LD A,(IX+$04)     ; Get sound byte
+       andi a,>0f00                    ; AND $0F           ; Isolate bits 0-3
+       li   hl,last_noise_operation    ; LD HL,$7278       ; Compare to stored value
+       cb   a,*hl                      ; CP (HL)           ; ...
+       jne  !                          ; RET Z             ; Return if same
+       .ret                            ;
+!
+       movb a,*hl                      ; LD (HL),A         ; Else store new value
+       movb @bytes+>e0,@c              ; LD C,$E0          ; and make noise (continue into #R$A303)
+
+* Send attenuation or noise control bytes to PSG
+*
+* Used by the routines at #R$A2F3 and #R$A31D.
+*
+* I:C Operation in upper nybble 1CC0XXXX or 1CC1XXXX
+* I:(IX+$04): Attenuation/noise AAAAXNNN or attenuation/freq AAAA00FF
+attn_or_noise_to_psg:                  ; >a303
+       movb @>04(ix),a                 ; LD A,(IX+$04)     ; Get sound byte
+       movb @c,r0                      ; BIT 4,C           ; If bit 4 of operation is 0, i.e. noise control
+       andi r0,>1000                   ;
+       jeq  _a30e                      ; JR Z,$A30E        ; Then skip shifting
+       srl  a,1                        ; RRCA              ; TODO: check code. Swap bits 4-7 and 0-3
+       srl  a,1                        ; RRCA              ; TODO: check code. ...
+       srl  a,1                        ; RRCA              ; TODO: check code. ...
+       srl  a,1                        ; RRCA              ; TODO: check code. ...
+_a30e:                                 ; >a30e
+       andi a,>0f00                    ; AND $0F           ; Isolate bits 0-3
+       socb @c,a                       ; OR C              ; Apply operation (attenuation or noise control) to bits
+                                                           ; 4-7
+       ; OUT ($FF),A                   ; OUT ($FF),A       ; TODO: check code. Send to PSG
+       .ret                            ; RET               ;
+
+* Send data for tone channel to PSG
+*
+* Used by the routine at #R$A2BB.
+*
+* I:A Mute operation for channel
+* I:C Attenuation operation for channel
+* I:D Tone operation for channel
+* I:(IX+$00): $00 for tone else mute
+tone_data_to_psg:                      ; >a314
+       movb *ix,@e                     ; LD E,(IX+$00)     ; Get byte 0
+       ab   one,@e                     ; INC E             ; If byte 0 was 0 then this is not 0
+       jne  attn_and_freq_to_psg       ; JR NZ,$A31D       ; Jump for tone
+       ; OUT ($FF),A                   ; OUT ($FF),A       ; TODO: check code. Mute
+       .ret                            ; RET               ;
+
+* Send attenuation and frequency bytes to PSG
+*
+* Used by the routine at #R$A314. Note: The value is actually 111,861 /
+* frequency, so higher numbers give lower notes
+*
+* I:C Attenuation operation in upper nybble (1CC1XXXX)
+* I:D Tone operation in upper nybble (1CC0XXXX)
+* I:(IX+$03) Frequency LSB
+* I:(IX+$04) Attenuation/frequency MSB (AAAA00FF)
+attn_and_freq_to_psg:                  ; >a31d
+       .call @attn_or_noise_to_psg     ; CALL $A303        ; Set attenuation
+       movb @>03(ix),a                 ; LD A,(IX+$03)     ; Frequency LSB
+       andi a,>0f00                    ; AND $0F           ; Isolate bits 0-3 of frequency
+       socb d,a                        ; OR D              ; Apply operation to bits 4-7
+       ; OUT ($FF),A                   ; OUT ($FF),A       ; TODO: check code. Send to PSG
+       movb @>03(ix),a                 ; LD A,(IX+$03)     ; Frequency LSB (FFFFFFFF)
+       andi a,>f000                    ; AND $F0           ; Isolate bits 4-7 of frequency (FFFF0000)
+       movb a,d                        ; LD D,A            ; Save it
+       movb @>04(ix),a                 ; LD A,(IX+$04)     ; Get frequency MSB (AAAA00FF)
+       andi a,>0f00                    ; AND $0F           ; Isolate lower nybble with bits 8-9 of frequency
+                                                           ; (000000FF)
+       socb d,a                        ; OR D              ; Now FFFF00FF in wrong order
+       srl  a,1                        ; RRCA              ; TODO: check code. FFFFF00F
+       srl  a,1                        ; RRCA              ; TODO: check code. FFFFFF00
+       srl  a,1                        ; RRCA              ; TODO: check code. 0FFFFFF0
+       srl  a,1                        ; RRCA              ; TODO: check code. 00FFFFFF
+       ; OUT ($FF),A                   ; OUT ($FF),A       ; TODO: check code. Send to PSG
+       .ret                            ; RET               ;
+

@@ -1,4 +1,7 @@
 ascii_patterns:
+      DATA >7E81,>BDA1,>A1BD,>817E       ;  Copyright
+      DATA >1F04,>0404,>0000,>0000       ;  Trademark
+      DATA >446C,>5454,>0000,>0000       ;  Trademark
       DATA >0000,>0000,>0000,>0000       ;  32 >20
       DATA >3030,>3030,>3000,>3000       ;  33 >21 !
       DATA >6C6C,>2800,>0000,>0000       ;  34 >22 "

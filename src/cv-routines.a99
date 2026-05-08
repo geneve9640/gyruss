@@ -1,3 +1,10 @@
+turn_off_sound:
+       movb @bytes+>9f,@sound
+       movb @bytes+>bf,@sound
+       movb @bytes+>df,@sound
+       movb @bytes+>ff,@sound
+       .ret
+
 mode_1:
        li   r0,>0000
        bl   @vwtr
@@ -38,39 +45,38 @@ init_table:
        srl  hl,7
        li   r0,>0500
        soc  hl,r0
-       jmp  init_table_2
+       jmp  init_table_5
 init_table_1:
        cb   a,@bytes+>01
-       jne  init_table_3
+       jne  init_table_2
 * Sprite generator table
        srl  hl,11
        li   r0,>0600
        soc  hl,r0
-       jmp  init_table_2
+       jmp  init_table_5
 init_table_2:
        cb   a,@bytes+>02
-       jne  init_table_4
+       jne  init_table_3
 * Pattern name table
        srl  hl,10
        li   r0,>0200
        soc  hl,r0
-       jmp  init_table_2
+       jmp  init_table_5
 init_table_3:
        cb   a,@bytes+>03
-       jne  init_table_5
+       jne  init_table_4
 * Pattern generator table
        srl  hl,11
        li   r0,>0400
        soc  hl,r0
-       jmp  init_table_2
+       jmp  init_table_5
 init_table_4:
        cb   a,@bytes+>04
        jne  init_table_6
 * Pattern color table
        srl  hl,6
-       li   r0,>0400
+       li   r0,>0300
        soc  hl,r0
-       jmp  init_table_2
 init_table_5:
        bl   @vwtr
 init_table_6:
@@ -81,8 +87,15 @@ read_register:
        .ret
 
 write_register:
-       movb bc,r0
+       mov  bc,r0
        bl   @vwtr
+       .ret
+
+read_vram:
+       mov  de,r0
+       mov  hl,r1
+       mov  bc,r2
+       bl   @vmbr
        .ret
 
 write_vram:
@@ -99,11 +112,24 @@ fill_vram:
        bl   @vsmw
        .ret
 
+put_vram:
+       mov de,r0
+       sla  r0,3
+       movb a,r1
+       srl  r1,8
+       sla  r1,1
+       a    @sat_vdp_address(r1),r0
+       mov  hl,r1
+       mov  iy,r2
+       sla  r2,3
+       bl   @vmbw
+       .ret
+
 load_ascii:
        mov  @pattern_generator_vdp_address,r0
-       ai   r0,32*8
+       ai   r0,29*8
        li   r1,ascii_patterns
-       li   r2,(128-32)*8
+       li   r2,(128-29)*8
        bl   @vmbw
        .ret
 

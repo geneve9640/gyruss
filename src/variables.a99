@@ -399,15 +399,15 @@ mine_countdown_to_shoot:               ; >7269
        byte >00
 
 * Pattern decoder length
-decoder_length:                        ; >726a
+decompress_length:                        ; >726a
        data >0000
 
 * Pattern decoder bits left
-decoder_bits_left:                     ; >726c
+decompress_bits_left:                     ; >726c
        byte >00
 
 * Pattern decoder source byte
-decoder_source_byte:                   ; >726d
+decompress_source_byte:                   ; >726d
        byte >00
 
 * Flag for showing double shot pickup

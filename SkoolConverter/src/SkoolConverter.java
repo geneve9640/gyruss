@@ -496,7 +496,7 @@ public class SkoolConverter {
                     tms9900Line.setInstruction("jlt  !");
                     break;
                 case "m":
-                    tms9900Line.setInstruction("jgt  !");
+                    tms9900Line.setInstruction("jhe  !");
                     break;
             }
         }
@@ -551,7 +551,7 @@ public class SkoolConverter {
                     case "nc":
                         return "nc";
                     case "p":
-                        return "gt";
+                        return "he";
                     case "m":
                         return "lt";
                     default:

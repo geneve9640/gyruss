@@ -78,25 +78,25 @@
        .endm
 
        .defm rst
-       .ifeq #1,8
+       .ifeq #1,>08
        .call @add_a_to_hl              ; JP $9AB3          ; Add A to HL
        .endif
-       .ifeq #1,16
+       .ifeq #1,>10
        .call @vdp_write_byte           ; JP $9AC3          ; Write VDP byte (DE = address, A = value)
        .endif
-       .ifeq #1,24
+       .ifeq #1,>18
        .call @write_register           ; JP $1FD9          ; WRITE_REGISTER (B = reg, C = value)
        .endif
-       .ifeq #1,32
+       .ifeq #1,>20
        .call @rnd                      ; JP $BFAE          ; Random number generator
        .endif
-       .ifeq #1,40
+       .ifeq #1,>28
        .call @allocate_sprite          ; JP $AD49          ; Allocate_sprite
        .endif
-       .ifeq #1,48
+       .ifeq #1,>30
        .call @load_sprite_pattern      ; JP $AD8B          ; Load sprite pattern
        .endif
-       .ifeq #1,56
+       .ifeq #1,>38
        .call @write_vram               ; JP $1FDF          ; WRITE_VRAM (HL = source, DE = dest, BC = count)
        .endif
        .endm
