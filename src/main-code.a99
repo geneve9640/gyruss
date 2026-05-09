@@ -7,11 +7,11 @@ entry:                                 ; >8024
        li   bc,random_number+1-center_of_projection ; LD BC,$03B9       ; ...
        movb @l,*hl                     ; LD (HL),L         ; ...
        .ldir                           ; LDIR              ; ...
-       li   hl,entry_wait_fire+>0019   ; LD HL,$8060       ; Set center of projection
+       li   hl,>8060                   ; LD HL,$8060       ; Set center of projection
        mov  hl,@center_of_projection   ; LD ($7000),HL     ; ...
        .call @init_sound               ; CALL $9ADE        ; Init sound
        .call @start_screen             ; CALL $90D6        ; Start screen
-       li   hl,write_vram+>0a51        ; LD HL,$2A30       ; 180 * 60 frames
+       li   hl,>2A30                   ; LD HL,$2A30       ; 180 * 60 frames
        mov  hl,@screensaver_countdown  ; LD ($7257),HL     ; Set screensaver countdown
 entry_wait_fire:                       ; >8047
        .halt                           ; HALT              ; Wait for interrupt
@@ -36,7 +36,7 @@ new_game:                              ; >8064
        li   de,>0300                   ; LD DE,$0300       ; Name table size
        sb   a,a                        ; XOR A             ; Zero
        .call @fill_vram                ; CALL $1F82        ; FILL_VRAM (clear screen)
-       li   hl,write_vram+>003d        ; LD HL,$201C       ; Last 4 bytes of color table
+       li   hl,>201c                   ; LD HL,$201C       ; Last 4 bytes of color table
        li   de,>0004                   ; LD DE,$0004       ; 4 bytes
        movb @bytes+>f1,a               ; LD A,$F1          ; Set to white/black
        .call @fill_vram                ; CALL $1F82        ; FILL_VRAM
@@ -243,7 +243,7 @@ _81e2:                                 ; >81e2
 * 
 * Used by the routine at #R$8170.
 wait_for_restart:                      ; >81ed
-       li   hl,write_vram+>2671        ; LD HL,$4650       ; 300 seconds
+       li   hl,>4650                   ; LD HL,$4650       ; 300 seconds
        mov  hl,@screensaver_countdown  ; LD ($7257),HL     ; Set screensaver countdown
 _81f3:                                 ; >81f3
        .halt                           ; HALT              ; 
@@ -312,7 +312,7 @@ _8245:                                 ; >8245
        sb   b,b                        ; LD B,$00          ; Divide by ten into B
 _8258:                                 ; >8258
        sb   @bytes+>0a,a               ; SUB $0A           ; ...
-       joc  _825f                      ; JR C,$825F        ; TODO: check code. ...
+       jlt  _825f                      ; JR C,$825F        ; ...
        ab   one,b                      ; INC B             ; ...
        jmp  _8258                      ; JR $8258          ; ...
 _825f:                                 ; >825f
@@ -530,7 +530,7 @@ _83b2:                                 ; >83b2
        movb @bytes+>09,@>17(ix)        ; LD (IX+$17),$09   ; Set color of sprite 1
 _83c2:                                 ; >83c2
        .rst >30                        ; RST $30           ; Load sprite pattern sprite 0
-       li   ix,_700e                   ; LD IX,$700E       ; Sprite 1
+       li   ix,sprite_data_1                   ; LD IX,$700E       ; Sprite 1
        .rst >30                        ; RST $30           ; Load sprite pattern sprite 1
        .call @display_ship_background_patterns ; CALL $A808        ; Display ship background patterns
 _83cb:                                 ; >83cb
@@ -568,7 +568,7 @@ _83ff:                                 ; >83ff
        sb   a,a                        ; XOR A             ; Reset death count
        movb a,@stage_death_count       ; LD ($7204),A      ; ...
        .call @display_planet           ; CALL $9175        ; Undraw planet
-       li   hl,write_vram+>003d        ; LD HL,$201C       ; Set 4 colors to white/black
+       li   hl,>201c                   ; LD HL,$201C       ; Set 4 colors to white/black
        li   de,>0004                   ; LD DE,$0004       ; ...
        movb @bytes+>f1,a               ; LD A,$F1          ; ...
        .call @fill_vram                ; CALL $1F82        ; FILL_VRAM
@@ -604,7 +604,7 @@ display_bonus:                         ; >8429
        movb @bytes+>30,b               ; LD B,$30          ; 48
 _8449:                                 ; >8449
        sb   @bytes+>0a,a               ; SUB $0A           ; Ships - 10
-       joc  display_hits               ; JR C,$8450        ; TODO: check code. Jump if ships < 10, A is now -10 to -1
+       jlt  display_hits               ; JR C,$8450        ; Jump if ships < 10, A is now -10 to -1
        ab   one,b                      ; INC B             ; +1 for every 10 ships
        jmp  _8449                      ; JR $8449          ; Loop
 
@@ -682,10 +682,10 @@ next_frame_upl_sprites:                ; >84b1
        movb *hl,a                      ; LD A,(HL)         ; Get new value
        andi a,>0100                    ; AND $01           ; Every second frame ...
        jne  _84c8                      ; JR NZ,$84C8       ; go directly to upload sprite data
-       movb @_700e,a                   ; LD A,($700E)      ; Else get type of sprite 1
+       movb @sprite_data_1,a           ; LD A,($700E)      ; Else get type of sprite 1
        cb   a,one                      ; CP $01            ; Is it 1 (ship 2)?
        jne  _84c8                      ; JR NZ,$84C8       ; If not upload sprite data
-       li   hl,_700e+>000b             ; LD HL,$7019       ; Get color of sprite 1
+       li   hl,sprite_data_1+>000b     ; LD HL,$7019       ; Get color of sprite 1
        movb *hl,a                      ; LD A,(HL)         ; ...
        li   r0,4*256                   ; XOR $04           ; Flip bit 4
        xor  r0,a                       ;                   
@@ -783,7 +783,7 @@ _8522:                                 ; >8522
        .pop hl                         ; POP HL            ; 
        .pop iy                         ; POP IY            ; 
        .pop ix                         ; POP IX            ; 
-       ; RETN                          ; RETN              ; TODO: check code. 
+       .ret                            ; RETN              ;
 
 * STAGE message
 stage_msg:                             ; >853c
@@ -1111,15 +1111,15 @@ handle_sprite_types_15_17:             ; >873e
        cb   a,@bytes+>18               ; CP $18            ; Is sprite type >= $18
        jhe  handle_sprite_types_0e_11  ; JR NC,$8790       ; If so, jump ahead
 * sprite types $15 - $17 (laser fence)
-       movb @bytes+>07,b               ; LD B,$07          ; Mask = 7
+       movb @bytes+>f8,b               ; LD B,$07          ; Mask = 7
        movb @status_flags,a            ; LD A,($71EB)      ; Check if you have died
        movb a,r0                       ; BIT 2,A           ; ...
        andi r0,>0400                   ;                   
        jeq  _8751                      ; JR Z,$8751        ; If not, skip next
-       movb @bytes+>03,b               ; LD B,$03          ; Else set Mask = 3
+       movb @bytes+>fc,b               ; LD B,$03          ; Else set mask = 3
 _8751:                                 ; >8751
        movb @frame_counter,a           ; LD A,($71F2)      ; Frame counter
-       ; AND B                         ; AND B             ; TODO: check code. AND mask
+       szcb b,a                        ; AND B             ; AND mask
        jne  _875d                      ; JR NZ,$875D       ; If not zero, skip next 2
        sb   one,@>01(ix)               ; DEC (IX+$01)      ; Decrement polar y
        ab   one,@>05(ix)               ; INC (IX+$05)      ; Mark for pattern reload
@@ -1198,18 +1198,14 @@ handle_sprite_types_0e_11:             ; >8790
 !
        movb @sprite_countdown_2,a      ; LD A,($7260)      ; Sprite countdown 2
        socb a,a                        ; OR A              ; Return if not zero
-       jeq  !                          ; RET NZ            ; ...
-       .ret                            ;                   
-!
-_87c1:                                 ; >87c1
-       equ  $
+       jne  !                          ; RET NZ            ; ...
        .call @create_enemy_shot        ; CALL $8A76        ; Create enemy shot
        sb   one,@>01(ix)               ; DEC (IX+$01)      ; Decrement polar y
        movb @sprite_data+>0002,a       ; LD A,($7004)      ; Ship polar x
        .call @move_towards_x           ; CALL $8AC0        ; Move towards x
        movb @bytes+>10,*ix             ; LD (IX+$00),$10   ; Set sprite type
        ab   one,@>05(ix)               ; INC (IX+$05)      ; Mark for pattern reload
-       .ret                            ; RET               ; Return to #R$8A41
+!      .ret                            ; RET               ; Return to #R$8A41
 
 * Create map entry for enemy sprite
 * 
@@ -1250,7 +1246,7 @@ _8801:                                 ; >8801
        movb @>01(ix),a                 ; LD A,(IX+$01)     ; Get polar y
        cb   a,d                        ; CP D              ; Compare with polar y from map
        jeq  return_enemy_to_map        ; JR Z,$8815        ; If same, jump ahead
-       joc  _8811                      ; JR C,$8811        ; TODO: check code. If less than, skip to increment polar y
+       jlt  _8811                      ; JR C,$8811        ; If less than, skip to increment polar y
        sb   one,@>01(ix)               ; DEC (IX+$01)      ; Decrement polar y
        .ret                            ; RET               ; Return to #R$8A41
 _8811:                                 ; >8811
@@ -1346,7 +1342,10 @@ _8878:                                 ; >8878
        jhe  _88d4                      ; JR NC,$88D4       ; Then jump to ...
        .call @stage_data_addr          ; CALL $84DB        ; Get stage data address in IY
        .rst >20                        ; RST $20           ; Random number
-       ; AND (IY+$03)                  ; AND (IY+$03)      ; TODO: check code. AND stage data byte 3 ($3F, $1F, $0F)
+       ; AND (IY+$03)                  ; AND (IY+$03)      ; AND stage data byte 3 ($3F, $1F, $0F)
+       movb @3(iy),r0
+       inv  r0
+       szcb r0,a
        jne  _88a7                      ; JR NZ,$88A7       ; If not all zeros, then jump (more likely on earlier
                                                            ; stages)
        sb   one,@>01(ix)               ; DEC (IX+$01)      ; Decrement polar y
@@ -1445,7 +1444,8 @@ update_sprite_path:                    ; >88fe
 _890f:                                 ; >890f
        sb   @bytes+>10,a               ; SUB $10           ; Decrement upper nybble
        movb a,@>03(ix)                 ; LD (IX+$03),A     ; Store again
-       jnc  move_animate_sprite_along_path ; JR NC,$8936       ; TODO: check code. If upper nybble >= 0, then jump to move sprite
+       jgt  move_animate_sprite_along_path ; JR NC,$8936       ; If upper nybble >= 0, then jump to move sprite
+       jeq  move_animate_sprite_along_path
 * This entry point is used by the routine at #R$8986.
 _8916:                                 ; >8916
        inc  hl                         ; INC HL            ; Else increment path address
@@ -1501,7 +1501,6 @@ _8951:                                 ; >8951
        movb @>02(ix),@e                ; LD E,(IX+$02)     ; Get polar x
        movb @>01(ix),d                 ; LD D,(IX+$01)     ; Get polar y
        movb *ix,b                      ; LD B,(IX+$00)     ; Get sprite type
-_895a:                                 ; >895a
        movb a,r0                       ; BIT 0,A           ; If bit for incrementing polar y is reset
        andi r0,>0100                   ;                   
        jeq  _8961                      ; JR Z,$8961        ; Then skip next
@@ -1607,11 +1606,12 @@ _89b8:                                 ; >89b8
        movb @>03(ix),a                 ; LD A,(IX+$03)     ; Get counter
        sb   @bytes+>10,a               ; SUB $10           ; Decrement upper nybble
        movb a,@>03(ix)                 ; LD (IX+$03),A     ; Save counter
-       jnc  move_sprite_along_path     ; JR NC,$89EB       ; TODO: check code. If upper nybble >= 0 then jump ahead
+       jgt  move_sprite_along_path     ; JR NC,$89EB       ; If upper nybble >= 0 then jump ahead
+       jeq  move_sprite_along_path
        inc  hl                         ; INC HL            ; Next path address
        movb *hl,a                      ; LD A,(HL)         ; Get path byte
        sb   @bytes+>10,a               ; SUB $10           ; Decrement upper nybble
-       joc  _8a3c                      ; JR C,$8A3C        ; TODO: check code. If < 0 then set flag and return
+       jlt  _8a3c                      ; JR C,$8A3C        ; If < 0 then set flag and return
        andi a,>f000                    ; AND $F0           ; Isolate upper nybble
        movb a,b                        ; LD B,A            ; Save it
        movb @>03(ix),a                 ; LD A,(IX+$03)     ; Get counter
@@ -1725,9 +1725,12 @@ _8a62:                                 ; >8a62
        .ret                            ;                   
 !
        movb @stage_data_index,a        ; LD A,($7203)      ; Get stage data index
-       cb   a,@bytes+>02               ; CP $02            ; Compare to 2
+;       cb   a,@bytes+>02               ; CP $02            ; Compare to 2
+       movb a,r0
        movb *iy,a                      ; LD A,(IY+$00)     ; Get first byte of stage data (speed?)
-       jnc  _8a72                      ; JR NC,$8A72       ; TODO: check code. If stage index >= 2, then skip ahead
+       cb   a,@bytes+>02
+       jgt  _8a72                      ; JR NC,$8A72       ; If stage index >= 2, then skip ahead
+       jeq  _8a72
        ab   a,a                        ; ADD A,A           ; Else multiply by 2
 _8a72:                                 ; >8a72
        movb a,@sprite_countdown_2      ; LD ($7260),A      ; Save sprite countdown 2
@@ -1792,13 +1795,15 @@ move_towards_x:                        ; >8ac0
        jne  !                          ; RET Z             ; Return if same
        .ret                            ;                   
 !
-       jnc  _8acc                      ; JR NC,$8ACC       ; TODO: check code. Jump if desired >= x
+       jgt  _8acc                      ; JR NC,$8ACC       ; Jump if desired >= x
        movb @b255,b                    ; LD B,$FF          ; Direction = -1
        neg a                           ; NEG               ; x = -x
 _8acc:                                 ; >8acc
-       cb   a,@bytes+>21               ; CP $21            ; Compare with top center
+;       cb   a,@bytes+>21               ; CP $21            ; Compare with top center
+       mov  a,r0
        movb b,a                        ; LD A,B            ; A = direction
-       joc  _8ad3                      ; JR C,$8AD3        ; TODO: check code. Jump if left half
+       cb   a,@bytes+>21
+       jlt  _8ad3                      ; JR C,$8AD3        ; Jump if left half
        neg a                           ; NEG               ; Invert direction in right half
 _8ad3:                                 ; >8ad3
        movb a,b                        ; LD B,A            ; B = direction
@@ -1894,23 +1899,31 @@ _8b2d:                                 ; >8b2d
        .pop iy                         ; POP IY            ; Restore background patterns address
 _8b66:                                 ; >8b66
        .push bc                        ; PUSH BC           ; Save counters
-       sb   @c,@c                      ; LD C,$00          ; C = 0
+;       sb   @c,@c                      ; LD C,$00          ; C = 0
+       clr  r1
        movb *iy,d                      ; LD D,(IY+$00)     ; D = byte from left column of pattern
        movb @>10(iy),@e                ; LD E,(IY+$10)     ; E = byte from right column of pattern
-       ab   one,b                      ; INC B             ; If pixel offset = 0
-       sb   one,b                      ; DEC B             ; ...
+;       ab   one,b                      ; INC B             ; If pixel offset = 0
+;       sb   one,b                      ; DEC B             ; ...
+       movb b,b
        jeq  _8b7c                      ; JR Z,$8B7C        ; Then skip shifting
 _8b73:                                 ; >8b73
        socb a,a                        ; OR A              ; Clear carry?
-       sra  d,1                        ; RR D              ; TODO: check code. Shift first byte
-       ; RR E                          ; RR E              ; TODO: check code. Shift second byte
-       ; RR C                          ; RR C              ; TODO: check code. Shift third byte
-       sb   one,b                      ; DJNZ $8B73        ; Repeat 'pixel offset' times (inner loop)
+       sra  d,1                        ; RR D              ; Shift first byte
+       ; RR E                          ; RR E              ; Shift second byte
+       ; RR C                          ; RR C              ; Shift third byte
+       jnc  !
+       srl  r1,1
+       socb @bytes+>80,r1
+       jmp  !!
+!      srl  r1,1
+!      sb   one,b                      ; DJNZ $8B73        ; Repeat 'pixel offset' times (inner loop)
        jne  _8b73                      ;                   
 _8b7c:                                 ; >8b7c
        movb d,*ix                      ; LD (IX+$00),D     ; Save shifted bytes in buffer
        movb @e,@>18(ix)                ; LD (IX+$18),E     ; 3 patterns offset
-       movb @c,@>30(ix)                ; LD (IX+$30),C     ; ...
+;       movb @c,@>30(ix)                ; LD (IX+$30),C     ; ...
+       movb r0,@>30(ix)
        inc  ix                         ; INC IX            ; Next destination address
        inc  iy                         ; INC IY            ; Next source address
        .pop bc                         ; POP BC            ; Restore counters
@@ -2090,9 +2103,10 @@ _8c6d:                                 ; >8c6d
        mov  @wave_data_address,iy      ; LD IY,($725D)     ; Get wave data address
        .push iy                        ; PUSH IY           ; Save pointer
        movb @>02(iy),a                 ; LD A,(IY+$02)     ; Get byte 3
-       sla  a,1                        ; RLCA              ; TODO: check code. Shift bit 5-7 into 0-2
-       sla  a,1                        ; RLCA              ; TODO: check code. ...
-       sla  a,1                        ; RLCA              ; TODO: check code. ...
+;       sla  a,1                        ; RLCA              ; Shift bit 5-7 into 0-2
+;       sla  a,1                        ; RLCA              ; ...
+;       sla  a,1                        ; RLCA              ; ...
+       srl  a,5
        andi a,>0700                    ; AND $07           ; And isolate them
        .push af                        ; PUSH AF           ; 
        .call @stage_data_addr          ; CALL $84DB        ; Get stage data address in IY
@@ -2110,17 +2124,18 @@ _8c6d:                                 ; >8c6d
        andi a,>fc00                    ; AND $FC           ; Isolate planet index bits
        li   hl,wave                    ; LD HL,$7201       ; Add wave
        ab   *hl,a                      ; ADD A,(HL)        ; ...
-       li   hl,_8e0c                   ; LD HL,$8E0C       ; Table at #R$8E0D - 1
+       li   hl,enemies_by_wave_table-1 ; LD HL,$8E0C       ; Table at #R$8E0D - 1
        .rst >08                        ; RST $08           ; Add A (1-24) to HL
        movb *hl,b                      ; LD B,(HL)         ; Get table value
 _8ca2:                                 ; >8ca2
        .rst >28                        ; RST $28           ; Allocate sprite
        movb b,*ix                      ; LD (IX+$00),B     ; Set sprite type
        movb @>03(iy),a                 ; LD A,(IY+$03)     ; Get wave data byte 3
-       srl  a,1                        ; RRA               ; TODO: check code. Shift bits 4-7 to 0-3
-       srl  a,1                        ; RRA               ; TODO: check code. ...
-       srl  a,1                        ; RRA               ; TODO: check code. ...
-       srl  a,1                        ; RRA               ; TODO: check code. ...
+;       srl  a,1                        ; RRA               ; Shift bits 4-7 to 0-3
+;       srl  a,1                        ; RRA               ; ...
+;       srl  a,1                        ; RRA               ; ...
+;       srl  a,1                        ; RRA               ; ...
+       srl  a,4
        andi a,>0f00                    ; AND $0F           ; Isolate bits 0-3
        movb a,@>0b(ix)                 ; LD (IX+$0B),A     ; Set color
        movb @>03(iy),a                 ; LD A,(IY+$03)     ; Get wave data byte 3
@@ -2210,10 +2225,11 @@ reset_outcoming_enemies:               ; >8d21
        movb a,*hl                      ; LD (HL),A         ; Save again
        mov  @wave_data_address,iy      ; LD IY,($725D)     ; Wave data address
        movb @>03(iy),a                 ; LD A,(IY+$03)     ; Get bits 4-7 of byte 3
-       srl  a,1                        ; RRA               ; TODO: check code. ...
-       srl  a,1                        ; RRA               ; TODO: check code. ...
-       srl  a,1                        ; RRA               ; TODO: check code. ...
-       srl  a,1                        ; RRA               ; TODO: check code. ...
+;       srl  a,1                        ; RRA               ; Shift bits 4-7 into bits 0-4
+;       srl  a,1                        ; RRA               ; ...
+;       srl  a,1                        ; RRA               ; ...
+;       srl  a,1                        ; RRA               ; ...
+       srl  a,4
        andi a,>0f00                    ; AND $0F           ; ...
 _8d43:                                 ; >8d43
        .call @allocate_map_entry       ; CALL $AAA6        ; Return enemies to center
@@ -2332,8 +2348,7 @@ _8e04:                                 ; >8e04
        andi a,>3f00                    ; AND $3F           ; $00 - $3F
        ab   @bytes+>10,a               ; ADD A,$10         ; $10 - $4F
        movb a,@laser_meteor_countdown  ; LD ($725F),A      ; Store countdown
-_8e0c:                                 ; >8e0c
-       .ret                            ; RET               ; 
+       .ret                            ; RET               ;
 
 * Enemy types in different waves (chance stage)
 enemies_by_wave_table:                 ; >8e0d
@@ -2360,7 +2375,7 @@ create_or_display_mines:               ; >8e2d
        jne  !                          ; JP Z,$8E9D        ; Then create mines
        b    @create_mines              ;                   
 !
-       joc  !                          ; JP NC,$8F55       ; TODO: check code. If 2 then display mines
+       jlt  !                          ; JP NC,$8F55       ; If 2 then display mines
        b    @_8f55                     ;                   
 !
        movb @status_flags,a            ; LD A,($71EB)      ; If died
@@ -2396,7 +2411,7 @@ create_or_display_mines:               ; >8e2d
        movb a,b                        ; LD B,A            ; B = planet
        movb @bytes+>05,a               ; LD A,$05          ; A = 5
        sb   b,a                        ; SUB B             ; 5 - planet
-       joc  _8e6d                      ; JR C,$8E6D        ; TODO: check code. If planet > 5 then skip ahead and set to 2
+       jlt  _8e6d                      ; JR C,$8E6D        ; If planet > 5 then skip ahead and set to 2
        cb   a,@bytes+>02               ; CP $02            ; If 5 - planet >= 2 then skip ahead
        jhe  _8e6f                      ; JR NC,$8E6F       ; ...
 _8e6d:                                 ; >8e6d
@@ -2521,9 +2536,10 @@ create_mine:                           ; >8f0f
        sb   @bytes+>04,a               ; SUB $04           ; Screen x - 4
        movb a,*iy                      ; LD (IY+$00),A     ; Save in structure
        movb @mine_name,a               ; LD A,($7268)      ; Get name
-       srl  a,1                        ; RRA               ; TODO: check code. Divide by 8
-       srl  a,1                        ; RRA               ; TODO: check code. ...
-       srl  a,1                        ; RRA               ; TODO: check code. ...
+;       srl  a,1                        ; RRA               ; Divide by 8
+;       srl  a,1                        ; RRA               ; ...
+;       srl  a,1                        ; RRA               ; ...
+       srl  a,3
        andi a,>1f00                    ; AND $1F           ; Mod 32
        movb a,@l                       ; LD L,A            ; HL = color set
        sb   h,h                        ; LD H,$00          ; ...
@@ -2750,16 +2766,17 @@ logo_letter:                           ; >912a
        li   bc,>01e0                   ; LD BC,$01E0       ; Display on, interrupt on
        .rst >18                        ; RST $18           ; WRITE_REGISTER
 start_screen_loop:                     ; >9167
-       jmp   start_screen_loop
        .halt                           ; HALT              ; Wait for interrupt
        .call @display_stars            ; CALL $AFFF        ; Display stars
-       .call @upload_sprite_patterns   ; CALL $AE94        ; 
-       joc  !                          ; RET NC            ; TODO: check code. Return is no carry
-       .ret                            ;                   
-!
-       .call @upload_sprite_patterns   ; CALL $AE94        ; 
-       joc  start_screen_loop          ; JR C,$9167        ; TODO: check code. Loop until no carry
-       .ret                            ; RET               ; 
+       .call @upload_sprite_patterns   ; CALL $AE94        ;
+;       joc  !                          ; RET NC            ; Return is no carry
+       abs @carry
+       jeq start_screen_1
+       .call @upload_sprite_patterns   ; CALL $AE94        ;
+       abs  @carry
+       jne  start_screen_loop          ; JR C,$9167        ; Loop until no carry
+start_screen_1:
+       .ret                            ; RET               ;
 
 * Display planet
 * 
@@ -2964,12 +2981,12 @@ _9258:                                 ; >9258
 _9271:                                 ; >9271
        movb a,@decompress_bits_left    ; LD ($726C),A      ; Save bits left
 ;       movb @decoder_source_byte,a     ; LD A,($726D)      ; Get source byte
-;       sla  a,1                        ; RLA               ; TODO: check code. Rotate left through carry
+;       sla  a,1                        ; RLA               ; Rotate left through carry
 ;       movb a,@decoder_source_byte     ; LD ($726D),A      ; Save again
-;       sla  b,1                        ; RL B              ; TODO: check code. Rotate carry into bite 0
+;       sla  b,1                        ; RL B              ; Rotate carry into bite 0
 ;       .pop af                         ; POP AF            ; Pop result
-;       sra  b,1                        ; RR B              ; TODO: check code. Rotate bit 0 into carry
-;       sla  a,1                        ; RLA               ; TODO: check code. Rotate carry into result
+;       sra  b,1                        ; RR B              ; Rotate bit 0 into carry
+;       sla  a,1                        ; RLA               ; Rotate carry into result
        .pop af
        movb @decompress_source_byte,@f
        sla  a,1
@@ -3205,7 +3222,8 @@ _980b:                                 ; >980b
        movb @>08(iy),b                 ; LD B,(IY+$08)     ; Get mine polar x
        .call @polar_x_distance         ; CALL $9A86        ; Polar x distance
        cb   a,@bytes+>07               ; CP $07            ; If < 7
-       ; CALL C,$9A75                  ; CALL C,$9A75      ; TODO: check code. Then call collision routine
+       jhe  _9829
+       .call @ship_hit_mine            ; CALL C,$9A75      ; Then call collision routine
 _9829:                                 ; >9829
        a    de,iy                      ; ADD IY,DE         ; Next mine
        .pop bc                         ; POP BC            ; Restore counter
@@ -3250,7 +3268,7 @@ handle_shot_collision:                 ; >9861
        movb @other_flags,a             ; LD A,($7256)      ; Flags
        movb a,@c                       ; LD C,A            ; C = flags
 * Check collision with sprites
-       li   iy,_701a                   ; LD IY,$701A       ; Data for sprite  2
+       li   iy,sprite_data_2                   ; LD IY,$701A       ; Data for sprite  2
        movb @bytes+>1e,b               ; LD B,$1E          ; 30 sprites
        li   de,>000c                   ; LD DE,$000C       ; Size of each sprite
 _986e:                                 ; >986e
@@ -3275,9 +3293,10 @@ _986e:                                 ; >986e
 _9891:                                 ; >9891
        movb @>01(iy),a                 ; LD A,(IY+$01)     ; Polar y other sprite
        sb   @>01(ix),a                 ; SUB (IX+$01)      ; Minus polar y shot
-       jnc  _989b                      ; JR NC,$989B       ; TODO: check code. Absolute value
-       neg a                           ; NEG               ; ...
-_989b:                                 ; >989b
+;       jnc  _989b                      ; JR NC,$989B       ; Absolute value
+;       neg a                           ; NEG               ; ...
+;_989b:                                 ; >989b
+       abs  a
        cb   a,@bytes+>02               ; CP $02            ; If >= 2
        jhe  _98bb                      ; JR NC,$98BB       ; Then move to next sprite
        movb @>02(iy),a                 ; LD A,(IY+$02)     ; Polar x other sprite
@@ -3319,9 +3338,10 @@ _98d1:                                 ; >98d1
        .call @polar_coord_from_map     ; CALL $AB38        ; Now DE contains polar y,x
        movb d,a                        ; LD A,D            ; Polar y
        sb   @>01(ix),a                 ; SUB (IX+$01)      ; Subtract polar y of shot
-       jnc  _98e0                      ; JR NC,$98E0       ; TODO: check code. Take absolute value
-       neg a                           ; NEG               ; ...
-_98e0:                                 ; >98e0
+;       jnc  _98e0                      ; JR NC,$98E0       ; Take absolute value
+;       neg a                           ; NEG               ; ...
+;_98e0:                                 ; >98e0
+       abs  a
        cb   a,@bytes+>02               ; CP $02            ; If < 2
        jhe  _98eb                      ; JR NC,$98EB       ; Then move on to next
        movb @e,a                       ; LD A,E            ; Polar x
@@ -3345,9 +3365,10 @@ _98f7:                                 ; >98f7
        jeq  _991d                      ; JR Z,$991D        ; Then move to next mine
        movb @>07(iy),a                 ; LD A,(IY+$07)     ; Get polar y of mine
        sb   @>01(ix),a                 ; SUB (IX+$01)      ; Subtract polar y of shot
-       jnc  _9909                      ; JR NC,$9909       ; TODO: check code. Absolute value
-       neg a                           ; NEG               ; ...
-_9909:                                 ; >9909
+;       jnc  _9909                      ; JR NC,$9909       ; Absolute value
+;       neg a                           ; NEG               ; ...
+;_9909:                                 ; >9909
+       abs  a
        cb   a,@bytes+>02               ; CP $02            ; >= 2
        jhe  _991d                      ; JR NC,$991D       ; Then move on to next mine
        .push bc                        ; PUSH BC           ; Save counter
@@ -3626,9 +3647,10 @@ ship_hit_mine:                         ; >9a75
 polar_x_distance:                      ; >9a86
        movb a,@temp_polar_x            ; LD ($726F),A      ; Store polar x1
        sb   b,a                        ; SUB B             ; Polar x1 - polar x2
-       jnc  _9a8e                      ; JR NC,$9A8E       ; TODO: check code. Jump ahead of >= 0
-       neg a                           ; NEG               ; Else make positive
-_9a8e:                                 ; >9a8e
+;       jnc  _9a8e                      ; JR NC,$9A8E       ; Jump ahead of >= 0
+;       neg a                           ; NEG               ; Else make positive
+;_9a8e:                                 ; >9a8e
+       abs  a
        cb   a,@bytes+>20               ; CP $20            ; Is it < 32?
        jhe  !                          ; RET C             ; Then return
        .ret                            ;                   
@@ -3645,7 +3667,7 @@ _9a9a:                                 ; >9a9a
        ab   @bytes+>40,a               ; ADD A,$40         ; Else add 64
 _9aa2:                                 ; >9aa2
        sb   @c,a                       ; SUB C             ; Subtract the modified polar x1
-       joc  !                          ; RET NC            ; TODO: check code. Return if >= 0
+       jlt  !                          ; RET NC            ; Return if >= 0
        .ret                            ;                   
 !
        neg a                           ; NEG               ; Else make positive
@@ -3667,7 +3689,7 @@ add_a_to_hl:                           ; >9ab3
 ;       .push af                        ; PUSH AF           ;
 ;       ab   @l,a                       ; ADD A,L           ;
 ;       movb a,@l                       ; LD L,A            ;
-;       jnc  _9ab9                      ; JR NC,$9AB9       ; TODO: check code.
+;       jnc  _9ab9                      ; JR NC,$9AB9       ;
 ;       ab   one,h                      ; INC H             ;
 ;_9ab9:                                 ; >9ab9
 ;       .pop af                         ; POP AF            ;
@@ -3675,14 +3697,6 @@ add_a_to_hl:                           ; >9ab3
        movb a,@r0lb
        a    r0,hl
        .ret                            ; RET               ;
-
-* Unused routine at 9ABB
-       movb a,@l                       ; LD L,A            ; 
-       sla  a,1                        ; RLA               ; TODO: check code. 
-       sb   a,a                        ; LD A,$00          ; 
-       sb   @zero,a                    ; SBC A,$00         ; 
-       movb a,h                        ; LD H,A            ; 
-       .ret                            ; RET               ; 
 
 * VDP write byte (RST $10)
 * 
@@ -3809,7 +3823,7 @@ explode:                               ; >a3e1
        .call @display_ship_background_patterns ; CALL $A808        ; Display ship background patterns
        movb @bytes+>7f,a               ; LD A,$7F          ; Not allocated
        movb a,@sprite_data             ; LD ($7002),A      ; 1st sprite
-       movb a,@_700e                   ; LD ($700E),A      ; 2nd sprite
+       movb a,@sprite_data_1                   ; LD ($700E),A      ; 2nd sprite
        movb @active_shots,a            ; LD A,($7253)      ; Active shots
        socb a,a                        ; OR A              ; If zero
        jeq  _a413                      ; JR Z,$A413        ; Then skip ahead
@@ -4115,10 +4129,11 @@ _a6a8:                                 ; >a6a8
        li   bc,>0300                   ; LD BC,$0300       ; B = 3 (digits), C = 0 (zero character offset)
 _a6ad:                                 ; >a6ad
        movb @>02(ix),a                 ; LD A,(IX+$02)     ; Get 3rd score byte (most significant)
-       srl  a,1                        ; RRA               ; TODO: check code. Shift BCD digit into place
-       srl  a,1                        ; RRA               ; TODO: check code. ...
-       srl  a,1                        ; RRA               ; TODO: check code. ...
-       srl  a,1                        ; RRA               ; TODO: check code. ...
+;       srl  a,1                        ; RRA               ; Shift BCD digit into place
+;       srl  a,1                        ; RRA               ; ...
+;       srl  a,1                        ; RRA               ; ...
+;       srl  a,1                        ; RRA               ; ...
+       srl  a,4
        .call @display_digit            ; CALL $A6C8        ; Display most significant digit
        sb   one,b                      ; DEC B             ; If B > 1
        jne  _a6bc                      ; JR NZ,$A6BC       ; Then don't choose new zero character offset
@@ -4214,9 +4229,13 @@ _a715:                                 ; >a715
        sb   one,b                      ; DJNZ $A715        ; Loop 3 times
        jne  _a715                      ;                   
        sb   a,a                        ; XOR A             ; All equal, set A = 0
+       mov  a,r0
+       jmp  !
 _a71e:                                 ; >a71e
-       .pop hl                         ; POP HL            ; Restore pointer to #R$71F8 or #R$71FE
-       joc  _a739                      ; JR C,$A739        ; TODO: check code. Return if extra life byte was bigger
+       movb *hl,r0
+!      .pop hl                         ; POP HL            ; Restore pointer to #R$71F8 or #R$71FE
+       cb   a,r0
+       jl  _a739                       ; JR C,$A739        ; Return if extra life byte was bigger
        movb *hl,a                      ; LD A,(HL)         ; Next extra life at 80000 more points
        ab   @bytes+>08,a               ; ADD A,$08         ; ...
        .daa                            ; DAA               ; ...
@@ -4258,14 +4277,16 @@ control_ship:                          ; >a73c
        cb   a,@b255                    ; CP $FF            ; Is it an impossible joystick value, e.g. up + down?
        jeq  _a781                      ; JR Z,$A781        ; Then skip ahead
        sb   @>02(ix),a                 ; SUB (IX+$02)      ; Table value - polar x
-       jeq  _a781                      ; JR Z,$A781        ; If zero the skip ahead (alredy there)
-       jnc  _a766                      ; JR NC,$A766       ; TODO: check code. If positive skip ahead
+       jeq  _a781                      ; JR Z,$A781        ; If zero then skip ahead (already there)
+       jgt  _a766                      ; JR NC,$A766       ; If positive skip ahead
        movb @b255,b                    ; LD B,$FF          ; Direction = -1 (anti-clockwise)
        neg a                           ; NEG               ; abs(value - polar x)
 _a766:                                 ; >a766
-       cb   a,@bytes+>21               ; CP $21            ; Is the difference < 33?
+;       cb   a,@bytes+>21               ; CP $21            ; Is the difference < 33?
+       movb a,r0
        movb b,a                        ; LD A,B            ; Direction
-       joc  _a76d                      ; JR C,$A76D        ; TODO: check code. The skip ahead
+       cb   r0,@bytes+>21
+       jlt  _a76d                      ; JR C,$A76D        ; Then skip ahead
        neg a                           ; NEG               ; Otherwise reverse direction
 _a76d:                                 ; >a76d
        ab   @>02(ix),a                 ; ADD A,(IX+$02)    ; Polar x + direction
@@ -4273,7 +4294,7 @@ _a76d:                                 ; >a76d
        movb a,@>02(ix)                 ; LD (IX+$02),A     ; Update polar x
        movb a,@>0e(ix)                 ; LD (IX+$0E),A     ; Also update sprite 1
        .rst >30                        ; RST $30           ; Load sprite pattern sprite 0
-       li   ix,_700e                   ; LD IX,$700E       ; Sprite 1
+       li   ix,sprite_data_1                   ; LD IX,$700E       ; Sprite 1
        .rst >30                        ; RST $30           ; Load sprite pattern sprite 1
        .call @display_ship_background_patterns ; CALL $A808        ; Display ship background patterns
 * Handle fire
@@ -4385,9 +4406,10 @@ display_ship_background_patterns:      ; >a808
        jhe  _a85a                      ; JR NC,$A85A       ; Jump if >= 21
        movb @sprite_data+>0002,a       ; LD A,($7004)      ; Ship's polar x
        ab   @bytes+>02,a               ; ADD A,$02         ; Polar x + 2
-       srl  a,1                        ; RRCA              ; TODO: check code. Rotate right 3 times
-       srl  a,1                        ; RRCA              ; TODO: check code. 00XXXXXX -> XXX00XXX
-       srl  a,1                        ; RRCA              ; TODO: check code. 
+;       srl  a,1                        ; RRCA              ; Rotate right 3 times
+;       srl  a,1                        ; RRCA              ; 00XXXXXX -> XXX00XXX
+;       srl  a,1                        ; RRCA              ; ...
+       srl  a,3
        andi a,>0600                    ; AND $06           ; XXX00XXX -> 00000XX0 (quadrant)
        li   hl,adjust_ship_x_y_table   ; LD HL,$A875       ; Adjustment table
        .rst >08                        ; RST $08           ; Add A to HL
@@ -4711,8 +4733,9 @@ _abc4:                                 ; >abc4
        .call @polar_to_screen          ; CALL $B1C6        ; Convert polar to screen
        .push de                        ; PUSH DE           ; Save screen coordinates
        movb *hl,a                      ; LD A,(HL)         ; Get map value
-       srl  a,1                        ; RRA               ; TODO: check code. Isolate 3 bits
-       srl  a,1                        ; RRA               ; TODO: check code. ...
+;       srl  a,1                        ; RRA               ; Isolate 3 bits
+;       srl  a,1                        ; RRA               ; ...
+       srl  a,2
        andi a,>0e00                    ; AND $0E           ; ...
        movb a,@c                       ; LD C,A            ; And load into BC
        sb   b,b                        ; LD B,$00          ; ...
@@ -4815,7 +4838,7 @@ plot_pixel:                            ; >ac47
        movb a,@c                       ; LD C,A            ; Store in C
        movb @e,a                       ; LD A,E            ; Screen x
        sb   @bytes+>70,a               ; SUB $70           ; - 112
-       jnc  _ac56                      ; JR NC,$AC56       ; TODO: check code. If < 0
+       jgt  _ac56                      ; JR NC,$AC56       ; If < 0
        sb   a,a                        ; XOR A             ; Then set to 0
 _ac56:                                 ; >ac56
        cb   a,@bytes+>20               ; CP $20            ; If < 32
@@ -4976,7 +4999,7 @@ _ad64:                                 ; >ad64
        movb *hl,a                      ; LD A,(HL)         ; Read number back
 ;       ab   @l,a                       ; ADD A,L           ; Add number to HL
 ;       movb a,@l                       ; LD L,A            ; ...
-;       joc  !                          ; JP NC,$AD74       ; TODO: check code. ...
+;       joc  !                          ; JP NC,$AD74       ; ...
 ;       b    @_ad74                     ;
 ;!
 ;       ab   one,h                      ; INC H             ; ...
@@ -5099,7 +5122,9 @@ _ae11:                                 ; >ae11
        .call @polar_to_screen          ; CALL $B1C6        ; Polar to screen
        movb d,@>08(ix)                 ; LD (IX+$08),D     ; Set y
        movb @e,@>09(ix)                ; LD (IX+$09),E     ; Set x
-       joc  handle_off_screen_sprite   ; JR C,$AE54        ; TODO: check code. If carry, sprite is outside visible screen, skip ahead
+;       joc  handle_off_screen_sprite   ; JR C,$AE54        ; If carry, sprite is outside visible screen, skip ahead
+       abs  @carry
+       jne  handle_off_screen_sprite
        jmp  _ae4e                      ; JR $AE4E          ; Return
 _ae2b:                                 ; >ae2b
        li   hl,exhaust_position_table  ; LD HL,$AFDD       ; If sprite type is ship exhaust, set HL to table address
@@ -5107,7 +5132,7 @@ _ae2b:                                 ; >ae2b
        andi a,>0300                    ; AND $03           ; Mod 4
        jne  _ae3f                      ; JR NZ,$AE3F       ; If not zero, skip ahead
        movb @>05(ix),a                 ; LD A,(IX+$05)     ; Get polar x (saved by #R$ADC7?)
-       srl  a,1                        ; RRA               ; TODO: check code. / 2
+       srl  a,1                        ; RRA               ; / 2
        andi a,>1e00                    ; AND $1E           ; 0, 2, 4 ... $1E
        li   hl,exhaust_position_table+>0002 ; LD HL,$AFDF       ; #R$AFDD+2
        .rst >08                        ; RST $08           ; Add A to HL
@@ -5169,6 +5194,7 @@ _ae86:                                 ; >ae86
 * flipped. One new pattern is generated with each call. Builds a table of VDP
 * addresses in #R$72E0. Used by the routine at #R$90D6.
 upload_sprite_patterns:                ; >ae94
+       clr  @carry
        movb @sprite_type_processed,a   ; LD A,($72D5)      ; Get sprite type
        cb   a,@b255                    ; CP $FF            ; If maxed out
        jne  !                          ; RET Z             ; Then return
@@ -5255,7 +5281,7 @@ upload_next_pattern:                   ; >af2c
        cb   a,*ix                      ; CP (IX+$00)       ; When it reaches LSB of control word (pattern count)
        jhe  upload_next_transformation ; JR NC,$AF3E       ; Then move to next transformation
        movb a,@pattern_processed       ; LD ($72D7),A      ; Otherwise store new value
-       ; SCF                           ; SCF               ; TODO: check code. Set carry flag
+       seto @carry                     ; SCF               ; Set carry flag
        .ret                            ; RET               ; 
 upload_next_transformation:            ; >af3e
        sb   a,a                        ; XOR A             ; 
@@ -5268,7 +5294,7 @@ upload_next_transformation:            ; >af3e
        cb   a,@bytes+>10               ; CP $10            ; When it reaches 16
        jhe  upload_next_sprite_type    ; JR NC,$AF55       ; Then move to next sprite type
        movb a,@transformation_processed ; LD ($72D6),A      ; Otherwise store new value
-       ; SCF                           ; SCF               ; TODO: check code. Set carry flag
+       seto @carry                     ; SCF               ; Set carry flag
        .ret                            ; RET               ; 
 upload_next_sprite_type:               ; >af55
        sb   a,a                        ; XOR A             ; 
@@ -5301,22 +5327,22 @@ _af7a:                                 ; >af7a
        li   r0,1
        clr  r2
 rotate_1:
-;       sla  *iy,1                      ; RL (IY+$00)       ; TODO: check code. Shift bit 7 of source byte 0 into carry
-;       sra  *hl,1                      ; RR (HL)           ; TODO: check code. Shift carry into bit 7 of destination byte
-;       sla  @>01(iy),1                 ; RL (IY+$01)       ; TODO: check code. x2
-;       sra  *hl,1                      ; RR (HL)           ; TODO: check code. ...
-;       sla  @>02(iy),1                 ; RL (IY+$02)       ; TODO: check code. x3
-;       sra  *hl,1                      ; RR (HL)           ; TODO: check code. ...
-;       sla  @>03(iy),1                 ; RL (IY+$03)       ; TODO: check code. x4
-;       sra  *hl,1                      ; RR (HL)           ; TODO: check code. ...
-;       sla  @>04(iy),1                 ; RL (IY+$04)       ; TODO: check code. x5
-;       sra  *hl,1                      ; RR (HL)           ; TODO: check code. ...
-;       sla  @>05(iy),1                 ; RL (IY+$05)       ; TODO: check code. x6
-;       sra  *hl,1                      ; RR (HL)           ; TODO: check code. ...
-;       sla  @>06(iy),1                 ; RL (IY+$06)       ; TODO: check code. x7
-;       sra  *hl,1                      ; RR (HL)           ; TODO: check code. ...
-;       sla  @>07(iy),1                 ; RL (IY+$07)       ; TODO: check code. x8
-;       sra  *hl,1                      ; RR (HL)           ; TODO: check code. ...
+;       sla  *iy,1                      ; RL (IY+$00)       ; Shift bit 7 of source byte 0 into carry
+;       sra  *hl,1                      ; RR (HL)           ; Shift carry into bit 7 of destination byte
+;       sla  @>01(iy),1                 ; RL (IY+$01)       ; x2
+;       sra  *hl,1                      ; RR (HL)           ; ...
+;       sla  @>02(iy),1                 ; RL (IY+$02)       ; x3
+;       sra  *hl,1                      ; RR (HL)           ; ...
+;       sla  @>03(iy),1                 ; RL (IY+$03)       ; x4
+;       sra  *hl,1                      ; RR (HL)           ; ...
+;       sla  @>04(iy),1                 ; RL (IY+$04)       ; x5
+;       sra  *hl,1                      ; RR (HL)           ; ...
+;       sla  @>05(iy),1                 ; RL (IY+$05)       ; x6
+;       sra  *hl,1                      ; RR (HL)           ; ...
+;       sla  @>06(iy),1                 ; RL (IY+$06)       ; x7
+;       sra  *hl,1                      ; RR (HL)           ; ...
+;       sla  @>07(iy),1                 ; RL (IY+$07)       ; x8
+;       sra  *hl,1                      ; RR (HL)           ; ...
        srl  r2,1
        movb *iy+,r1
        sla  r1,0
@@ -5369,9 +5395,9 @@ _afd0:                                 ; >afd0
        sb   a,a
        movb *hl,r0
 _afd2:                                 ; >afd2
-;       sla  *hl,1                      ; RL (HL)           ; TODO: check code. Shift source byte left, bit 7 to carry
-;       srl  a,1                        ; RRA               ; TODO: check code. Shift right, carry to bit 7, bit 0 to carry
-;       jnc  _afd2                      ; JR NC,$AFD2       ; TODO: check code. Repeat until bit 7 reaches carry (8 times)
+;       sla  *hl,1                      ; RL (HL)           ; Shift source byte left, bit 7 to carry
+;       srl  a,1                        ; RRA               ; Shift right, carry to bit 7, bit 0 to carry
+;       jnc  _afd2                      ; JR NC,$AFD2       ; Repeat until bit 7 reaches carry (8 times)
        srl  a,1
        sla  r0,1
        jnc  !
@@ -5388,7 +5414,6 @@ _afd2:                                 ; >afd2
 * Ship exhaust position relative to ship body
 exhaust_position_table:                ; >afdd
        byte >00,>00,>08,>00,>06,>FF,>06,>FB
-_afe5:                                 ; >afe5
        byte >05,>FB,>00,>F9,>FF,>FA,>FB,>FB
        byte >FC,>FB,>F9,>00,>FA,>01,>FB,>05
        byte >FB,>05,>00,>07,>01,>05,>05,>05
@@ -5411,7 +5436,7 @@ display_stars:                         ; >afff
        jeq  _b00f                      ; JR Z,$B00F        ; 
        movb @bytes+>03,*hl             ; LD (HL),$03       ; If bit 0 is set then reset counter to 3
 _b00f:                                 ; >b00f
-       sb   @c,@c                      ; LD C,$00          ; Set mask to undraw
+       movb @b255,@c                   ; LD C,$00          ; Set mask to undraw (swapped since we use szcb)
        .call @display_star_frame       ; CALL $B023        ; 
        movb @star_frame,a              ; LD A,($731A)      ; Get star frame
        ab   @bytes+>02,a               ; ADD A,$02         ; Add 2
@@ -5420,7 +5445,7 @@ _b00f:                                 ; >b00f
        sb   a,a                        ; XOR A             ; 
 _b01e:                                 ; >b01e
        movb a,@star_frame              ; LD ($731A),A      ; Set star frame to zero
-       movb @b255,@c                   ; LD C,$FF          ; Set mask to draw
+       sb   @c,@c                      ; LD C,$FF          ; Set mask to draw (swapped since we use szcb)
 
 * Display star frame
 * 
@@ -5431,14 +5456,15 @@ display_star_frame:                    ; >b023
        movb @star_frame,a              ; LD A,($731A)      ; 0, 2, 4, 6, 8, 10
        li   hl,star_frame_lookup       ; LD HL,$B04F       ; Table of pointers
        .rst >08                        ; RST $08           ; Add A to HL
-       movb *hl,@e                     ; LD E,(HL)         ; Get LSB
-       inc  hl                         ; INC HL            ; 
-       movb *hl,d                      ; LD D,(HL)         ; Get MSB
+;       movb *hl,@e                     ; LD E,(HL)         ; Get LSB
+;       inc  hl                         ; INC HL            ;
+;       movb *hl,d                      ; LD D,(HL)         ; Get MSB
+       mov  *hl,de
        mov  @name_table_vdp_address,hl ; LD HL,($73F6)     ; Get VDP address (always 0)
        .ex_de_hl                       ; EX DE,HL          ; Now HL holds address of star frame table to use
 _b031:                                 ; >b031
        movb *hl,a                      ; LD A,(HL)         ; Get byte from table
-       socb a,a                        ; OR A              ; 
+;       socb a,a                        ; OR A              ;
        jne  !                          ; RET Z             ; Zero terminates
        .ret                            ;                   
 !
@@ -5447,7 +5473,7 @@ _b031:                                 ; >b031
        cb   a,@bytes+>18               ; CP $18            ; >= 18
        jhe  _b041                      ; JR NC,$B041       ; Then skip writing
        movb *hl,a                      ; LD A,(HL)         ; Get byte from table
-       ; AND C                         ; AND C             ; TODO: check code. Apply mask
+       szcb @c,a                       ; AND C             ; Apply mask
        .rst >10                        ; RST $10           ; Write VDP byte A to DE
 _b041:                                 ; >b041
        inc  de                         ; INC DE            ; Next VDP address
@@ -5456,10 +5482,12 @@ _b042:                                 ; >b042
        b    @_b031                     ; JP $B031          ; Loop
 _b046:                                 ; >b046
        andi a,>7f00                    ; AND $7F           ; Reset bit 7
-       ab   @e,a                       ; ADD A,E           ; Add VDP address LSB
-       movb a,@e                       ; LD E,A            ; Write back to E
-       jnc  _b042                      ; JR NC,$B042       ; TODO: check code. Loop if no carry
-       ab   one,d                      ; INC D             ; Increment MSB if carry
+;       ab   @e,a                       ; ADD A,E           ; Add VDP address LSB
+;       movb a,@e                       ; LD E,A            ; Write back to E
+;       jnc  _b042                      ; JR NC,$B042       ; Loop if no carry
+;       ab   one,d                      ; INC D             ; Increment MSB if carry
+       swpb a
+       a    a,de
        jmp  _b042                      ; JR $B042          ; Loop
 
 * Star frame lookup
@@ -5559,7 +5587,8 @@ stars:                                 ; >b134
 polar_to_screen:                       ; >b1c6
        .push ix                        ; PUSH IX           ; 
        .push hl                        ; PUSH HL           ; 
-       .push bc                        ; PUSH BC           ; 
+       .push bc                        ; PUSH BC           ;
+       clr  @carry
        movb @bytes+>0b,a               ; LD A,$0B          ; 11
        ab   d,a                        ; ADD A,D           ; Polar y + 11
        jlt  _b217                      ; JP M,$B217        ; If this is 128 or more (polar y > 116 or polar y <
@@ -5580,11 +5609,13 @@ polar_to_screen:                       ; >b1c6
 _b1de:                                 ; >b1de
        andi a,>0f00                    ; AND $0F           ; Use the first 4 inverted bits
        ab   a,a                        ; ADD A,A           ; x2 (2 bytes per x)
-       ab   @l,a                       ; ADD A,L           ; Add to address
-       movb a,@l                       ; LD L,A            ; ...
-       jnc  _b1e6                      ; JR NC,$B1E6       ; TODO: check code. ...
-       ab   one,h                      ; INC H             ; ...
-_b1e6:                                 ; >b1e6
+;       ab   @l,a                       ; ADD A,L           ; Add to address
+;       movb a,@l                       ; LD L,A            ; ...
+;       jnc  _b1e6                      ; JR NC,$B1E6       ; ...
+;       ab   one,h                      ; INC H             ; ...
+;_b1e6:                                 ; >b1e6
+       swpb a
+       a    a,hl
        li   bc,polar_to_screen_table   ; LD BC,$B21D       ; Lookup table base address
        a    bc,hl                      ; ADD HL,BC         ; Add to address
        movb *hl,a                      ; LD A,(HL)         ; Get table value
@@ -5592,9 +5623,10 @@ _b1e6:                                 ; >b1e6
        jeq  _b217                      ; JR Z,$B217        ; Then set position outside screen and return
        li   ix,center_of_projection    ; LD IX,$7000       ; Center of projection
        movb @e,a                       ; LD A,E            ; x
-       srl  a,1                        ; RRCA              ; TODO: check code. Shift right
-       ; XOR E                         ; XOR E             ; TODO: check code. Bit 4 is now set if bit 5 (left/right) and bit 4 (top
-                                                           ; left/lower right) were different, i.e. top of screen
+       movb a,r0
+       srl  a,1                        ; RRCA              ; Shift right
+       ; XOR E                         ; XOR E             ; Bit 4 is now set if bit 5 (left/right) and bit 4 (top
+       xor  r0,a                                           ; left/lower right) were different, i.e. top of screen
        movb a,r0                       ; BIT 4,A           ; Test bit 4 (top of screen)
        andi r0,>1000                   ;                   
        movb *hl,a                      ; LD A,(HL)         ; Get table value
@@ -5622,7 +5654,7 @@ _b212:                                 ; >b212
        .ret                            ; RET               ; ...
 _b217:                                 ; >b217
        li   de,>f500                   ; LD DE,$F500       ; Set return position outside screen
-       ; SCF                           ; SCF               ; TODO: check code. Set carry flag
+       seto @carry                     ; SCF               ; Set carry flag
        jmp  _b212                      ; JR $B212          ; To return
 
 * Random number generator (RST $20)
@@ -5632,14 +5664,18 @@ rnd:                                   ; >bfae
        .push ix                        ; PUSH IX           ; 
        li   ix,random_number           ; LD IX,$731B       ; Last random number
        movb *ix,a                      ; LD A,(IX+$00)     ; Get byte 0
-       sla  a,1                        ; RLCA              ; TODO: check code. Rotate left
-       ; XOR (IX+$00)                  ; XOR (IX+$00)      ; TODO: check code. Flip some bits
-       srl  a,1                        ; RRCA              ; TODO: check code. Rotate right
+       sla  a,1                        ; RLCA              ; Rotate left
+       ; XOR (IX+$00)                  ; XOR (IX+$00)      ; Flip some bits
+       movb @1(ix),r0
+       xor  r0,a
+       srl  a,1                        ; RRCA              ; Rotate right
        ab   one,@>01(ix)               ; INC (IX+$01)      ; Increment byte 1
        ab   @>01(ix),a                 ; ADD A,(IX+$01)    ; Add byte 1
-       ; AND A                         ; AND A             ; TODO: check code. Set flags
-       ; JP PE,$BFC9                   ; JP PE,$BFC9       ; TODO: check code. Skip ahead if even parity
-       ab   one,@>01(ix)               ; INC (IX+$01)      ; Else increment byte 1
+       ; AND A                         ; AND A             ; Set flags
+       ; JP PE,$BFC9                   ; JP PE,$BFC9       ; Skip ahead if even parity
+       jop  !
+       jmp  _bfc9
+!      ab   one,@>01(ix)               ; INC (IX+$01)      ; Else increment byte 1
 _bfc9:                                 ; >bfc9
        movb a,*ix                      ; LD (IX+$00),A     ; Set byte 0
        .pop ix                         ; POP IX            ; 
