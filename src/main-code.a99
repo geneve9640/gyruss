@@ -94,6 +94,7 @@ _80e0:                                 ; >80e0
 *
 * Used by the routines at #R$81AE and #R$83D0.
 main_loop:                             ; >80e8
+       bl   @ti_vsync
        .call @sound_player
 ;       li   hl,interrupt_flag          ; LD HL,$725A       ; Flag set by interrupt routine
 ;_80eb:                                 ; >80eb
@@ -101,7 +102,7 @@ main_loop:                             ; >80e8
 ;       andi r0,>0100                   ;
 ;       jeq  _80eb                      ; JR Z,$80EB        ; Wait until set
 ;       szcb @bits+0,*hl                ; RES 0,(HL)        ; Clear flag
-       .call @read_register            ; CALL $1FDC        ; READ_REGISTER (read VDP status)
+;       .call @read_register            ; CALL $1FDC        ; READ_REGISTER (read VDP status)
        .call @display_stars            ; CALL $AFFF        ; Display stars
        .call @control_ship             ; CALL $A73C        ; Control ship
        .call @process_sprites          ; CALL $85E6        ; Process sprites
@@ -2784,7 +2785,7 @@ start_screen_loop:                     ; >9167
        .halt                           ; HALT              ; Wait for interrupt
        .call @display_stars            ; CALL $AFFF        ; Display stars
        .call @upload_sprite_patterns   ; CALL $AE94        ;
-;       joc  !                          ; RET NC            ; Return is no carry
+;       joc  !                          ; RET NC            ; Return if no carry
        abs @carry
        jeq start_screen_1
        .call @upload_sprite_patterns   ; CALL $AE94        ;
@@ -3776,6 +3777,7 @@ _a34c:                                 ; >a34c
        movb @bytes+>14,b               ; LD B,$14          ; 20
 _a36e:                                 ; >a36e
        .push bc                        ; PUSH BC           ; Save counter
+       .call @sound_player
        .call @move_dots                ; CALL $A471        ; Move dots
        .call @control_ship             ; CALL $A73C        ; Control ship
        .call @upload_sprite_data       ; CALL $ACF9        ; Upload sprite data
@@ -3808,6 +3810,7 @@ _a36e:                                 ; >a36e
 _a3b6:                                 ; >a3b6
        .halt                           ; HALT              ; Wait interrupt
        .push bc                        ; PUSH BC           ; Save counter
+       .call @sound_player
        .call @display_stars            ; CALL $AFFF        ; Display stars
        .call @control_ship             ; CALL $A73C        ; Control ship
        .call @display_center_enemies   ; CALL $AB72        ; Display center enemies

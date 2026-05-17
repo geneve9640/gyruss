@@ -2,6 +2,7 @@
 *
 * Byte 0 in each row is the channel. Rows are copied into the corresponding
 * sound fx data buffer.
+* Byte 5 - >80 is the index into the sound_fx_command_jump_table.
 * #TABLE(default, default)
 * { =h Index | =h Played when }
 * { $00 | None }

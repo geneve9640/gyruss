@@ -71,7 +71,7 @@ play_tune_2:                           ; >9b2b
 play_tune_3:                           ; >9b54
        movb @bytes+>09,@c              ; LD C,$09          ; Set C = 9 (sound index)
 play_tune_4:                           ; >9b56
-       b    @play_sound_no_checks      ; JP $9CB5          ; Play sound fx
+       b    @play_sound_fx_2           ; JP $9CB5          ; Play sound fx
 play_tune_5:
        .ret
 
@@ -344,27 +344,26 @@ relative_jump_1:                       ; >9ca3
 *
 * Used by the routine at #R$9EA3.
 *
-* I:C Index of sound (1-9), maybe 1 is no sound?
-play_sound:                            ; >9ca8
-       movb @tune_index,a            ; LD A,($727C)      ; Get tune playing
+* I:C Index of sound FX (1-9), maybe 1 is no sound?
+play_sound_fx:                         ; >9ca8
+       movb @tune_index,a              ; LD A,($727C)      ; Get tune playing
        ; AND A                         ; AND A             ; If zero
-       jeq  play_sound_1               ; RET Z             ; Then return
+       jeq  play_sound_fx_1            ; RET Z             ; Then return
        cb   a,@bytes+>06               ; CP $06            ; Are we playing tune 6?
-       jeq  play_sound_no_checks       ; JR Z,$9CB5        ; Then skip ahead
-       movb @c,a                       ; LD A,C            ; A = index of sound
+       jeq  play_sound_fx_2            ; JR Z,$9CB5        ; Then skip ahead
+       movb @c,a                       ; LD A,C            ; A = index of sound FX
        cb   a,@bytes+>02               ; CP $02            ; Is it < 2?
-       jhe  play_sound_no_checks       ; RET C             ; Then return
-play_sound_1:
+       jhe  play_sound_fx_2            ; RET C             ; Then return
+play_sound_fx_1:
        .ret
 * This entry point is used by the routines at #R$9B54 and #R$9E01.
-play_sound_no_checks:                  ; >9cb5
-       equ  $
-       movb @c,a                       ; LD A,C            ; A = index of sound
+play_sound_fx_2:                       ; >9cb5
+       movb @c,a                       ; LD A,C            ; A = index of sound FX
        .push af                        ; PUSH AF           ; Save index
-       .call @init_play_sound_fx                    ; CALL $9CBF        ; Call next routine
+       .call @init_sound_fx            ; CALL $9CBF        ; Call next routine
        .pop af                         ; POP AF            ; Restore index
        cb   a,@bytes+>09               ; CP $09            ; Is it 9? (if called from play_tune or #R$9E45)
-       jne  play_sound_1               ; RET NZ            ; Return if not
+       jne  play_sound_fx_1               ; RET NZ            ; Return if not
        ab   one,a                      ; INC A             ; Index + 1 (now 10) (continue into #R$9CBF)
 
 * Copy data from #R$9CE7 to sound fx channel, and change pointer from sound
@@ -373,7 +372,7 @@ play_sound_no_checks:                  ; >9cb5
 * Used by the routine at #R$9CA8.
 *
 * label=init_play_sound_fx
-init_play_sound_fx:                    ; >9cbf
+init_sound_fx:                    ; >9cbf
        andi af,>ff00
 ;       sla  a,1                        ; RLCA              ; Multiply by 8
 ;       sla  a,1                        ; RLCA              ; ...
@@ -406,8 +405,8 @@ init_play_sound_fx:                    ; >9cbf
 _9ce3:                                 ; >9ce3
 ;       movb @e,*hl                     ; LD (HL),E         ; Set pointer LSB
 ;       inc  hl                         ; INC HL            ; Next address
-       movb @e,*hl+
-       movb d,*hl                      ; LD (HL),D         ; Set pointer MSB
+;       movb d,*hl                      ; LD (HL),D         ; Set pointer MSB
+       mov  de,*hl                     ; Set pointer
        .ret                            ; RET               ;
 
 * Sound fx done
@@ -440,8 +439,9 @@ sound_fx_done:                         ; >9d3d
        movb a,@e                       ; LD E,A            ; DE = A
        li   hl,tune_data_buffer_1      ; LD HL,$727D       ; Sound data base
        a    de,hl                      ; ADD HL,DE         ; Add offset
-       movb @l,*iy                     ; LD (IY+$00),L     ; Update pointer with sound data address
-       movb h,@>01(iy)                 ; LD (IY+$01),H     ; ...
+;       movb @l,*iy                     ; LD (IY+$00),L     ; Update pointer with sound data address
+;       movb h,@>01(iy)                 ; LD (IY+$01),H     ; ...
+       mov  hl,*iy
        .ret                            ; RET               ;
 
 * Execute commands for all sound fx channels
@@ -504,10 +504,10 @@ sound_fx_command_3:                    ; >9da7
        movb a,@c                       ; LD C,A            ; And save
        andi a,>0f00                    ; AND $0F           ; Test if bits 0-3 were 0
        movb @c,a                       ; LD A,C            ; Restore incremented value
-       jne  _9db5                      ; JR NZ,$9DB5       ; If bits weren't 0 then skip next
+       jne  sound_fx_command_3_a       ; JR NZ,$9DB5       ; If bits weren't 0 then skip next
        ab   @bytes+>10,a               ; ADD A,$10         ; Add 1 to attenuation
-       jeq  _9dfc                      ; JR Z,$9DFC        ; If it rolled over then sound FX done
-_9db5:                                 ; >9db5
+       jeq  current_sound_fx_done      ; JR Z,$9DFC        ; If it rolled over then sound FX done
+sound_fx_command_3_a:                  ; >9db5
        movb a,@>04(ix)                 ; LD (IX+$04),A     ; Save again
        .ret                            ; RET               ;
 
@@ -520,7 +520,7 @@ _9db5:                                 ; >9db5
 sound_fx_command_6:                    ; >9db9
        movb @>04(ix),a                 ; LD A,(IX+$04)     ; Get attenuation/noise control (starts with $48)
        ab   @bytes+>04,a               ; ADD A,$04         ; Add 4 (changes noise control?)
-       jeq  _9dfc                      ; JR Z,$9DFC        ; If it rolled over then sound FX done
+       jeq  current_sound_fx_done      ; JR Z,$9DFC        ; If it rolled over then sound FX done
        movb a,@>04(ix)                 ; LD (IX+$04),A     ; Else save again
        .ret                            ; RET               ;
 
@@ -534,13 +534,14 @@ sound_fx_command_1_4:                  ; >9dc4
        movb @>03(ix),a                 ; LD A,(IX+$03)     ; Get frequency LSB (starts at $40 or $80)
        sb   @bytes+>0c,a               ; SUB $0C           ; Subtract 12
        movb a,@>03(ix)                 ; LD (IX+$03),A     ; Save again
-       jlt  !                          ; RET P             ; Return if positive
-       .ret                            ;
-!
+       jgt  sound_fx_command_1_4_a     ; RET P             ; Return if positive
+       jeq  sound_fx_command_1_4_a
        movb @>06(ix),a                 ; LD A,(IX+$06)     ; Get reset value (starts same as IX+$03)
        movb a,@>03(ix)                 ; LD (IX+$03),A     ; Reset value
        movb @bytes+>20,@c              ; LD C,$20          ; Value to increase attenuation by
-       jmp  _9df2                      ; JR $9DF2          ; Jump to increase attenuation
+       jmp  sound_fx_command_0_a       ; JR $9DF2          ; Jump to increase attenuation
+sound_fx_command_1_4_a:
+       .ret                            ;
 
 * Sound FX command 2
 *
@@ -552,7 +553,7 @@ sound_fx_command_2:                    ; >9dd7
        movb @>03(ix),a                 ; LD A,(IX+$03)     ; Get frequency LSB (starts at $70)
        ab   @bytes+>04,a               ; ADD A,$04         ; Add 4
        movb a,@>03(ix)                 ; LD (IX+$03),A     ; Save again
-       jeq  _9dfc                      ; JR Z,$9DFC        ; If it rolled over then sound fx done
+       jeq  current_sound_fx_done      ; JR Z,$9DFC        ; If it rolled over then sound fx done
        andi a,>0400                    ; AND $04           ; Else isolate bit 2 of frequency
        inv  a                          ; CPL               ; Invert
        movb a,*ix                      ; LD (IX+$00),A     ; Save in byte 0 to switch between noise and mute
@@ -568,22 +569,19 @@ sound_fx_command_0:                    ; >9de8
        sb   one,@>03(ix)               ; DEC (IX+$03)      ; Decrement frequency LSB (starts at $00)
        movb @>03(ix),a                 ; LD A,(IX+$03)     ; Get frequency LSB
        srl  a,1                        ; RRA               ; Shift bit 0 into carry
-       jnc  !                          ; RET C             ; Return if bit 0 was set
-       .ret                            ;
-!
+       joc  sound_fx_command_0_b       ; RET C             ; Return if bit 0 was set
        movb @bytes+>10,@c              ; LD C,$10          ;
 * This entry point is used by the routine at #R$9DC4.
-_9df2:                                 ; >9df2
+sound_fx_command_0_a:                  ; >9df2
        movb @>04(ix),a                 ; LD A,(IX+$04)     ; AAAA00FF (starts at $26)
        ab   @c,a                       ; ADD A,C           ; Add 1 to attenuation
        movb a,@>04(ix)                 ; LD (IX+$04),A     ; Store again
-       andi a,>f000                    ; AND $F0           ; Return if attenuation has no rolled over to 0
-       jeq  !                          ; RET NZ            ; ...
+       andi a,>f000                    ; AND $F0           ; Return if attenuation has not rolled over to 0
+       jeq  current_sound_fx_done      ; RET NZ            ; ...
+sound_fx_command_0_b:
        .ret                            ;
-!
 * This entry point is used by the routines at #R$9DA7 and #R$9DC4.
-_9dfc:                                 ; >9dfc
-       equ  $
+current_sound_fx_done:                 ; >9dfc
        movb b,a                        ; LD A,B            ; Channel index + 1
        sb   one,a                      ; DEC A             ; Channel index
        b    @sound_fx_done             ; JP $9D3D          ; Sound fx done
@@ -603,21 +601,23 @@ sound_fx_command_5_8:                  ; >9e01
        movb @sound_fx_data_buffer_4_12,@e
        movb @sound_fx_data_buffer_4_12+1,d
        a    de,hl                      ; ADD HL,DE         ; Add them, e.g. $005C
-       movb h,a                        ; LD A,H            ; $00
+       movb h,a                        ; LD A,H            ; Get MSB of result, e.g. $00
 ;       mov  hl,@sound_fx_data_buffer_4_34 ; LD ($72C0),HL     ; Save again
        movb @l,@sound_fx_data_buffer_4_34
        movb h,@sound_fx_data_buffer_4_34+1
        socb @bits+7,@>04(ix)           ; SET 7,(IX+$04)    ; $80
        cb   a,@bytes+>04               ; CP $04            ; If >= 4
-       jhe  _9e1f                      ; JR NC,$9E1F       ; Then skip ahead
+       jhe  sound_fx_command_5_8_a     ; JR NC,$9E1F       ; Then skip ahead
 ;       mov  @sound_fx_data_buffer_4_67,de ; LD DE,($72C3)     ; Else get byte 6-7, e.g. $03C0
        movb @sound_fx_data_buffer_4_67,@e
        movb @sound_fx_data_buffer_4_67+1,d
-       ; AND A                         ; AND A             ; Clear carry
-       s    de,hl                      ; SBC HL,DE         ; Subtract it
-       jnc  _9e1f                      ; RET C             ; TODO: check code. Return if < 0
-       .ret                            ;
-_9e1f:                                 ; >9e1f
+;       ; AND A                         ; AND A             ; Clear carry
+;       s    de,hl                      ; SBC HL,DE         ; Subtract it
+;       jnc  _9e1f                      ; RET C             ; Return if de > hl
+       c    de,hl
+       jh   sound_fx_command_5_8_c
+       s    de,hl
+sound_fx_command_5_8_a:                ; >9e1f
        movb @bytes+>80,@>03(ix)        ; LD (IX+$03),$80   ; Set byte 3-4
        movb @bytes+>80,@>04(ix)        ; LD (IX+$04),$80   ; ...
        .ex_de_hl                       ; EX DE,HL          ;
@@ -629,21 +629,19 @@ _9e1f:                                 ; >9e1f
        movb h,@sound_fx_data_buffer_4_67+1
        movb h,a                        ; LD A,H            ;
        ; AND A                         ; AND A             ;
-       jne  _9e4a                      ; JR NZ,$9E4A       ;
+       jne  sound_fx_command_5_8_b     ; JR NZ,$9E4A       ;
        movb @l,a                       ; LD A,L            ;
        cb   a,@bytes+>ea               ; CP $EA            ;
-       jhe  _9e4a                      ; JR NC,$9E4A       ;
+       jhe  sound_fx_command_5_8_b     ; JR NC,$9E4A       ;
        movb @>05(ix),a                 ; LD A,(IX+$05)     ;
        cb   a,@bytes+>85               ; CP $85            ;
-       jeq  !                          ; JP NZ,$9DFC       ; Sound FX done
-       b    @_9dfc                     ;
-!
+       jne  current_sound_fx_done      ; JP NZ,$9DFC       ; Sound FX done
        movb @bytes+>09,@c              ; LD C,$09          ; Sound index
        .push bc                        ; PUSH BC           ;
-       .call @play_sound_no_checks     ; CALL $9CB5        ; Play sound 9
+       .call @play_sound_fx_2          ; CALL $9CB5        ; Play sound 9
        .pop bc                         ; POP BC            ;
-       .ret                            ; RET               ;
-_9e4a:                                 ; >9e4a
+       jmp  sound_fx_command_5_8_c     ; RET               ;
+sound_fx_command_5_8_b:                ; >9e4a
        li   de,>0080                   ; LD DE,$0080       ;
        ; AND A                         ; AND A             ;
        s    de,hl                      ; SBC HL,DE         ;
@@ -655,6 +653,7 @@ _9e4a:                                 ; >9e4a
 ;       mov  hl,@sound_fx_data_buffer_4_12 ; LD ($72BE),HL     ; Set byte 1-2
        movb  @l,@sound_fx_data_buffer_4_12
        movb  hl,@sound_fx_data_buffer_4_12+1
+sound_fx_command_5_8_c:
        .ret                            ; RET               ;
 
 * Sound FX command 7
@@ -666,11 +665,11 @@ _9e4a:                                 ; >9e4a
 sound_fx_command_7:                    ; >9e5c
        movb @>02(ix),a                 ; LD A,(IX+$02)     ; Get byte 2 (starts with $00)
        ab   @>03(ix),a                 ; ADD A,(IX+$03)    ; Add byte 3 (starts with $FC = -4)
-       jeq  _9dfc                      ; JR Z,$9DFC        ; If zero then sound FX done
+       jeq  current_sound_fx_done      ; JR Z,$9DFC        ; If zero then sound FX done
        cb   a,@bytes+>30               ; CP $30            ; If >= $30
-       jhe  _9e6c                      ; JR NC,$9E6C       ; Then skip next
+       jhe  sound_fx_command_7_a       ; JR NC,$9E6C       ; Then skip next
        movb @bytes+>04,@>03(ix)        ; LD (IX+$03),$04   ; Byte 3 = 4
-_9e6c:                                 ; >9e6c
+sound_fx_command_7_a:                  ; >9e6c
        movb a,@>02(ix)                 ; LD (IX+$02),A     ; Byte 2 = byte 2 + byte 3 from before
        socb @bytes+>05,a               ; OR $05            ; Set bits 0 and 3
        movb a,@>04(ix)                 ; LD (IX+$04),A     ; Save in attenuation/noise control
@@ -678,26 +677,28 @@ _9e6c:                                 ; >9e6c
 
 * Sound FX command 9
 *
-* Tone (silent). Increases frequency up to $016C.
+* Tone. Increases frequency up to $016C.
 *
 * I:B Channel index + 1
 * I:IX Sound fx data
 sound_fx_command_9:                    ; >9e75
        ab   one,@>03(ix)               ; INC (IX+$03)      ; Increment frequency LSB (starts at $00)
        ab   one,@>03(ix)               ; INC (IX+$03)      ; Increment frequency LSB
-       jne  _9e80                      ; JR NZ,$9E80       ; If it didn't turn over, skip ahead
+       jne  sound_fx_command_9_a       ; JR NZ,$9E80       ; If it didn't turn over, skip ahead
        ab   one,@>04(ix)               ; INC (IX+$04)      ; Increment frequency MSB
-_9e80:                                 ; >9e80
-       mov  @sound_fx_data_buffer_4_34,hl ; LD HL,($72C0)     ; Get attenuation/frequency of channel 4 (this channel)
+sound_fx_command_9_a:                  ; >9e80
+;      mov  @sound_fx_data_buffer_4_34,hl ; LD HL,($72C0)     ; Get attenuation/frequency of channel 4 (this channel)
+       movb @sound_fx_data_buffer_4_34,@l
+       movb @sound_fx_data_buffer_4_34+1,h
        li   de,>f16c                   ; LD DE,$F16C       ; Compare to this number
        ; AND A                         ; AND A             ; Clear carry
        s    de,hl                      ; SBC HL,DE         ; ...
-       jeq  !                          ; RET NZ            ; And return if not the same
-       .ret                            ;
-!
-       .call @_9dfc                    ; CALL $9DFC        ; Sound fx done for this channel
+       jne  sound_fx_command_9_b       ; RET NZ            ; And return if not the same
+       .call @current_sound_fx_done    ; CALL $9DFC        ; Sound fx done for this channel
        sb   a,a                        ; XOR A             ; Sound fx done for channel 0 (played together with noise)
        b    @sound_fx_done             ; JP $9D3D          ; ...
+sound_fx_command_9_b:
+       .ret                            ;
 
 * Call play tune, preserve registers
 *
@@ -729,7 +730,7 @@ call_play_sound:                       ; >9ea3
        .push ix                        ; PUSH IX           ;
        .push iy                        ; PUSH IY           ;
        movb a,@c                       ; LD C,A            ;
-       .call @play_sound               ; CALL $9CA8        ; Play sound
+       .call @play_sound_fx               ; CALL $9CA8        ; Play sound
        .pop iy                         ; POP IY            ;
        .pop ix                         ; POP IX            ;
        .pop hl                         ; POP HL            ;
