@@ -3721,13 +3721,17 @@ add_a_to_hl:                           ; >9ab3
 *
 * I:DE Write address I:A byte to write
 vdp_write_byte:                        ; >9ac3
-       .push af                        ; PUSH AF           ;
-       movb @e,a                       ; LD A,E            ; LSB
-       movb a,@vdpwa                   ; OUT ($BF),A       ; Set LSB of VDP address
-       movb d,a                        ; LD A,D            ; MSB
-       socb @bytes+>40,a               ; OR $40            ; Setup write address
-       movb a,@vdpwa                   ; OUT ($BF),A       ; Set MSB of VDP address
-       .pop af                         ; POP AF            ;
+;       .push af                        ; PUSH AF           ;
+;       movb @e,a                       ; LD A,E            ; LSB
+;       movb a,@vdpwa                   ; OUT ($BF),A       ; Set LSB of VDP address
+       movb @e,@vdpwa
+;       movb d,a                        ; LD A,D            ; MSB
+;       socb @bytes+>40,a               ; OR $40            ; Setup write address
+;       movb a,@vdpwa                   ; OUT ($BF),A       ; Set MSB of VDP address
+;       .pop af                         ; POP AF            ;
+       movb d,r0
+       ori  r0,>4000
+       movb r0,@vdpwa
        movb a,@vdpwd                   ; OUT ($BE),A       ; Write byte
        rt                              ; RET               ;
 
@@ -3738,15 +3742,17 @@ vdp_write_byte:                        ; >9ac3
 * I:DE Read address
 * O:A Byte read
 vdp_read_byte:                         ; >9ad0
-       movb @e,a                       ; LD A,E            ; Set LSB of VDP address
-       movb a,@vdpwa                   ; OUT ($BF),A       ;
-       movb d,a                        ; LD A,D            ;
-       movb a,@vdpwa                   ; OUT ($BF),A       ; Set MSB of VDP address
+;       movb @e,a                       ; LD A,E            ; Set LSB of VDP address
+;       movb a,@vdpwa                   ; OUT ($BF),A       ;
+       movb @e,@vdpwa
+;       movb d,a                        ; LD A,D            ;
+;       movb a,@vdpwa                   ; OUT ($BF),A       ; Set MSB of VDP address
+       movb d,@vdpwa
 ;       .push ix                        ; PUSH IX           ; Delay
 ;       .pop ix                         ; POP IX            ;
        nop                             ; NOP               ;
        movb @vdprd,a                   ; IN A,($BE)        ; Read byte
-       .ret                            ; RET               ;
+       rt                              ; RET               ;
 
 * Initial game loop
 *
@@ -4730,7 +4736,7 @@ _ac79:                                 ; >ac79
        jne  _ac79                      ; JR NZ,$AC79       ; ...
 _ac7e:                                 ; >ac7e
        .ex_de_hl                       ; EX DE,HL          ; DE = VDP address, HL = coordinates
-       .call @vdp_read_byte            ; CALL $9AD0        ; Read VDP byte
+       bl   @vdp_read_byte             ; CALL $9AD0        ; Read VDP byte
        socb b,a                        ; OR B              ; Apply pixel
        .rst >10                        ; RST $10           ; Write VDP byte
        .ex_de_hl                       ; EX DE,HL          ; DE = coordinates
@@ -5423,10 +5429,9 @@ display_stars:                         ; >afff
 !
        movb @bytes+>07,*hl             ; LD (HL),$07       ; Reset counter to 7
        movb @status_flags,a            ; LD A,($71EB)      ; Test warp flag
-       movb a,r0                       ; BIT 0,A           ; ...
-       andi r0,>0100                   ;
+       czc  @bit0,a                    ; BIT 0,A           ; ...
        jeq  _b00f                      ; JR Z,$B00F        ; If bit 0 is set then reset counter to 3
-;       movb @bytes+>03,*hl             ; LD (HL),$03       ; ...
+       movb @bytes+>03,*hl             ; LD (HL),$03       ; ...
 _b00f:                                 ; >b00f
        movb @b255,@c                   ; LD C,$00          ; Set mask to undraw (swapped since we use szcb)
        .call @display_star_frame       ; CALL $B023        ;
@@ -5454,25 +5459,25 @@ display_star_frame:                    ; >b023
        mov  *hl,de
        mov  @name_table_vdp_address,hl ; LD HL,($73F6)     ; Get VDP address (always 0)
        .ex_de_hl                       ; EX DE,HL          ; Now HL holds address of star frame table to use
-_b031:                                 ; >b031
+display_star_frame_1:                  ; >b031
        movb *hl,a                      ; LD A,(HL)         ; Get byte from table
 ;       socb a,a                        ; OR A              ;
        jne  !                          ; RET Z             ; Zero terminates
        .ret                            ;
 !
-       jlt  _b046                      ; JP M,$B046        ; If bit 7 is set it's a change of VDP address
-       .call @vdp_read_byte            ; CALL $9AD0        ; vdp_read_byte from DE
+       jlt  display_star_frame_4       ; JP M,$B046        ; If bit 7 is set it's a change of VDP address
+       bl   @vdp_read_byte             ; CALL $9AD0        ; vdp_read_byte from DE
        cb   a,@bytes+>18               ; CP $18            ; >= 18
-       jhe  _b041                      ; JR NC,$B041       ; Then skip writing
+       jhe  display_star_frame_2       ; JR NC,$B041       ; Then skip writing
        movb *hl,a                      ; LD A,(HL)         ; Get byte from table
        szcb @c,a                       ; AND C             ; Apply mask
        .rst >10                        ; RST $10           ; Write VDP byte A to DE
-_b041:                                 ; >b041
+display_star_frame_2:                  ; >b041
        inc  de                         ; INC DE            ; Next VDP address
-_b042:                                 ; >b042
+display_star_frame_3:                  ; >b042
        inc  hl                         ; INC HL            ; Next table address
-       b    @_b031                     ; JP $B031          ; Loop
-_b046:                                 ; >b046
+       b    @display_star_frame_1      ; JP $B031          ; Loop
+display_star_frame_4:                  ; >b046
        andi a,>7f00                    ; AND $7F           ; Reset bit 7
 ;       ab   @e,a                       ; ADD A,E           ; Add VDP address LSB
 ;       movb a,@e                       ; LD E,A            ; Write back to E
@@ -5480,7 +5485,7 @@ _b046:                                 ; >b046
 ;       ab   one,d                      ; INC D             ; Increment MSB if carry
        swpb a
        a    a,de
-       jmp  _b042                      ; JR $B042          ; Loop
+       jmp  display_star_frame_3                      ; JR $B042          ; Loop
 
 * Convert polar to screen coordinates
 *
