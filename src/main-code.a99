@@ -110,7 +110,7 @@ main_loop:                             ; >80e8
        .call @handle_collisions        ; CALL $9796        ; Handle collisions
        .call @create_or_display_mines  ; CALL $8E2D        ;
 ;       .call @read_register            ; CALL $1FDC        ; READ_REGISTER
-       .call @manage_waves             ; CALL $8BD9        ; Manage waves
+       .call @handle_waves             ; CALL $8BD9        ; Manage waves
        .call @create_sprite_from_map_entry ; CALL $AAF1        ; Create sprite from map entry
 ;       .call @read_register            ; CALL $1FDC        ; READ_REGISTER
        .call @create_laser_fence_or_meteor ; CALL $8D50        ; Create laser fence
@@ -717,17 +717,21 @@ upload_patterns:                       ; >84cb
 *
 * O:IY Stage data address
 stage_data_addr:                       ; >84db
-       .push de                        ; PUSH DE           ;
-       movb @stage_data_index,a        ; LD A,($7203)      ; Get value (0 - 6)
-       ab   a,a                        ; ADD A,A           ; Multiply by 8
-       ab   a,a                        ; ADD A,A           ; ...
-       ab   a,a                        ; ADD A,A           ; ...
-       movb a,@e                       ; LD E,A            ; Add #R$8541
-       sb   d,d                        ; LD D,$00          ; ...
-       li   iy,stage_data_table        ; LD IY,$8541       ; ...
-       a    de,iy                      ; ADD IY,DE         ; ...
-       .pop de                         ; POP DE            ;
-       .ret                            ; RET               ;
+;       .push de                        ; PUSH DE           ;
+       clr  iy       
+       movb @stage_data_index,iy        ; LD A,($7203)      ; Get value (0 - 6)
+;       ab   a,a                        ; ADD A,A           ; Multiply by 8
+;       ab   a,a                        ; ADD A,A           ; ...
+;       ab   a,a                        ; ADD A,A           ; ...
+       sla  iy,3
+;       movb a,@e                       ; LD E,A            ; Add #R$8541
+;       sb   d,d                        ; LD D,$00          ; ...
+       swpb iy
+       ai   iy,stage_data_table
+;       li   iy,stage_data_table        ; LD IY,$8541       ; ...
+;       a    de,iy                      ; ADD IY,DE         ; ...
+;       .pop de                         ; POP DE            ;
+       rt                               ; RET               ;
 
 * Clear rows 9 and 14
 *
@@ -1096,7 +1100,7 @@ handle_sprite_type_03:                 ; >870c
 !
        movb @sprite_data+>0002,a       ; LD A,($7004)      ; Get ship polar x
        movb @>02(ix),b                 ; LD B,(IX+$02)     ; Get polar x
-       .call @polar_x_distance         ; CALL $9A86        ; Polar x distance
+       bl   @polar_x_distance          ; CALL $9A86        ; Polar x distance
        cb   a,@bytes+>04               ; CP $04            ; Is it >= 4
        jl   !                          ; RET NC            ; Then return
        .ret                            ;
@@ -1347,7 +1351,7 @@ _8878:                                 ; >8878
        movb @>03(ix),a                 ; LD A,(IX+$03)     ; Get counter
        cb   a,@bytes+>40               ; CP $40            ; If >= $40
        jhe  _88d4                      ; JR NC,$88D4       ; Then jump to ...
-       .call @stage_data_addr          ; CALL $84DB        ; Get stage data address in IY
+       bl   @stage_data_addr           ; CALL $84DB        ; Get stage data address in IY
        .rst >20                        ; RST $20           ; Random number
        ; AND (IY+$03)                  ; AND (IY+$03)      ; AND stage data byte 3 ($3F, $1F, $0F)
        movb @3(iy),r0
@@ -1712,7 +1716,7 @@ return_from_sprite_handler_1:          ; >8a4e
 *
 * Used by the routine at #R$85E6.
 all_sprites_processed:                 ; >8a53
-       .call @stage_data_addr          ; CALL $84DB        ; Get stage data address in IY
+       bl   @stage_data_addr           ; CALL $84DB        ; Get stage data address in IY
        movb @sprite_countdown,a        ; LD A,($71EE)      ; Get sprite countdown
 ;       socb a,a                        ; OR A              ; Is it zero
        jne  _8a62                      ; JR NZ,$8A62       ; No, skip ahead
@@ -1754,7 +1758,7 @@ maybe_create_enemy_shot:               ; >8a76
        jeq  !                          ; RET NZ            ; Then return
        .ret                            ;
 !
-       .call @stage_data_addr          ; CALL $84DB        ; Get stage data address in IY
+       bl   @stage_data_addr           ; CALL $84DB        ; Get stage data address in IY
        movb @active_enemy_shots,a      ; LD A,($7252)      ; Get enemy shots
        cb   a,@>01(iy)                 ; CP (IY+$01)       ; Compare with stage data byte 1
        jl   !                          ; RET NC            ; Return if shots >= max shots
@@ -1989,60 +1993,56 @@ _8bc9:                                 ; >8bc9
 * Manage waves
 *
 * Used by the routine at #R$80E8.
-manage_waves:                          ; >8bd9
+handle_waves:                          ; >8bd9
        movb @status_flags,a            ; LD A,($71EB)      ; Check bit for all waves completed
-       movb a,r0                       ; BIT 1,A           ; ...
-       andi r0,>0200                   ;
-       jeq  !                          ; RET NZ            ; Return if set
-       .ret                            ;
-!
+       czc  @bit1,a                    ; BIT 1,A           ; ...
+       jne  handle_waves_2             ; RET NZ            ; Return if set
        movb @outcoming_enemies,a       ; LD A,($725C)      ; Outcoming enemies
 ;       socb a,a                        ; OR A              ; Is it zero?
-       jeq  !                          ; JP NZ,$8C68       ; If not, jump ahead to add enemy
-       b    @handle_wave_outcoming     ;
-!
+       jne  handle_wave_outcoming      ; JP NZ,$8C68       ; If not, jump ahead to add enemy
        movb @active_enemies,a          ; LD A,($722C)      ; Get active enemies
 ;       socb a,a                        ; OR A              ; Return if not zero
-       jeq  !                          ; RET NZ            ; ...
-       .ret                            ;
-!
+       jne  handle_waves_2             ; RET NZ            ; ...
        movb @frame_counter,a           ; LD A,($71F2)      ; Frame counter
        andi a,>0300                    ; AND $03           ; 3 of 4 times,
-       jne  _8bfc                      ; JR NZ,$8BFC       ; skip ahead
+       jne  handle_waves_1             ; JR NZ,$8BFC       ; skip ahead
        movb @countdown_to_wave,a       ; LD A,($71F0)      ; Get counter value
        sb   one,a                      ; DEC A             ; Decrement value
-       jlt  _8bfc                      ; JP M,$8BFC        ; If negative, skip ahead
+       jlt  handle_waves_1             ; JP M,$8BFC        ; If negative, skip ahead
        movb a,@countdown_to_wave       ; LD ($71F0),A      ; Save counter again
-_8bfc:                                 ; >8bfc
+handle_waves_1:                        ; >8bfc
        movb @wave,a                    ; LD A,($7201)      ; Get wave
        cb   a,@bytes+>04               ; CP $04            ; Compare to 4
-       jl   manage_wave_lt_4           ; JR C,$8C30        ; If < 4, jump ahead
-       jeq  manage_wave_eq_4           ; JR Z,$8C07        ; If = 4, jump ahead
-       jmp  init_mine_sub_stage        ; JR $8C1E          ; If > 4, jump ahead
+       jl   manage_wave_lt_4           ; JR C,$8C30        ; If < 4, jump to handler
+       jeq  manage_wave_eq_4           ; JR Z,$8C07        ; If = 4, jump to handler
+       jmp  all_waves_completed        ; JR $8C1E          ; If > 4 then all waves completed
+handle_waves_2:
+       .ret
 
 * Manage wave = 4
 *
 * Used by the routine at #R$8BD9.
 manage_wave_eq_4:                      ; >8c07
        movb @status_flags,a            ; LD A,($71EB)      ; Test for chance stage
-       movb a,r0                       ; BIT 3,A           ; ...
-       andi r0,>0800                   ;
-       jne  init_mine_sub_stage        ; JR NZ,$8C1E       ; If set, set bit for all waves completed
+       czc  @bit3,a                    ; BIT 3,A           ; ...
+       jne  all_waves_completed        ; JR NZ,$8C1E       ; If set then all waves completed
        movb @center_map_entries,a      ; LD A,($722B)      ; Number of center enemies
        cb   a,@bytes+>06               ; CP $06            ; If >= 6,
-       jhe  init_mine_sub_stage        ; JR NC,$8C1E       ; Then init mine sub-stage
+       jhe  all_waves_completed        ; JR NC,$8C1E       ; Then all waves completed
+;      Less than 6 center enemies
+       clr  af
        .rst >20                        ; RST $20           ; Random number
-_8c16:                                 ; >8c16
+manage_wave_eq_4_1:                    ; >8c16
        cb   a,@bytes+>14               ; CP $14            ; If < 20,
-       jl   _8c3e                      ; JR C,$8C3E        ; Then skip ahead
-       sb   @bytes+>14,a               ; SUB $14           ; - 20
-       jmp  _8c16                      ; JR $8C16          ; Loop until small enough
+       jl   start_wave_in_a            ; JR C,$8C3E        ; Then start that wave
+       sb   @bytes+>14,a               ; SUB $14           ; Else subtract 20
+       jmp  manage_wave_eq_4_1         ; JR $8C16          ; Loop until small enough
 
-* Init mine sub-stage
+* All waves completed
 *
 * Used by the routines at #R$8BD9 and #R$8C07. Init mine sub-stage when wave >
-* 4 or wave = 4 and not chance stage.
-init_mine_sub_stage:                   ; >8c1e
+* 4 or wave = 4 and chance stage.
+all_waves_completed:                   ; >8c1e
        sb   a,a                        ; XOR A             ; A = 0
        movb a,@outcoming_enemies       ; LD ($725C),A      ; Reset outcoming enemies
        movb a,@countdown_to_wave       ; LD ($71F0),A      ; Reset counter
@@ -2063,21 +2063,22 @@ manage_wave_lt_4:                      ; >8c30
 !
        movb @stage,a                   ; LD A,($7200)      ; Get stage
        andi a,>fc00                    ; AND $FC           ; Isolate planet index bits
-       li   hl,wave                    ; LD HL,$7201       ; Add wave
-       ab   *hl,a                      ; ADD A,(HL)        ; ...
+;       li   hl,wave                    ; LD HL,$7201       ; Add wave
+;       ab   *hl,a                      ; ADD A,(HL)        ; ...
+       ab   @wave,a
 * This entry point is used by the routine at #R$8C07.
-_8c3e:                                 ; >8c3e
-       ab   a,a                        ; ADD A,A           ; Multiply by 4
-       ab   a,a                        ; ADD A,A           ; ...
+start_wave_in_a:                       ; >8c3e
+;       ab   a,a                        ; ADD A,A           ; Multiply by 4
+;       ab   a,a                        ; ADD A,A           ; ...
+       sla  a,2                        ; Multiply by 4
        movb a,@c                       ; LD C,A            ; BC = offset into table
        sb   b,b                        ; LD B,$00          ; ...
        li   hl,wave_init_data          ; LD HL,$A4BE       ; Table base address
        movb @status_flags,a            ; LD A,($71EB)      ; Is it chance stage?
-       movb a,r0                       ; BIT 3,A           ; ...
-       andi r0,>0800                   ;
+       czc  @bit3,a                    ; BIT 3,A           ; ...
        jeq  start_new_wave             ; JR Z,$8C52        ; If not, jump ahead
        li   hl,chance_wave_init_data   ; LD HL,$A51E       ; Else load other table
-       jmp  _8c57                      ; JR $8C57          ; And jump ahead
+       jmp  start_new_wave_1           ; JR $8C57          ; And jump ahead
 
 * Start new wave
 *
@@ -2086,15 +2087,16 @@ start_new_wave:                        ; >8c52
        movb @bytes+>02,a               ; LD A,$02          ; Play a sound
        .call @call_play_sound          ; CALL $9EA3        ; ...
 * This entry point is used by the routine at #R$8C30.
-_8c57:                                 ; >8c57
+start_new_wave_1:                      ; >8c57
        a    bc,hl                      ; ADD HL,BC         ; Add offset to table base
        mov  hl,@wave_data_address      ; LD ($725D),HL     ; Save table address
-       li   hl,wave                    ; LD HL,$7201       ; Next wave
-       ab   one,*hl                    ; INC (HL)          ; ...
+;       li   hl,wave                    ; LD HL,$7201       ; Next wave
+;       ab   one,*hl                    ; INC (HL)          ; ...
+       ab   one,@wave
        li   hl,other_flags             ; LD HL,$7256       ; Flags
        szcb @bits+5,*hl                ; RES 5,(HL)        ; Reset flag
        socb @bits+6,*hl                ; SET 6,(HL)        ; Set flag
-       jmp  _8c6d                      ; JR $8C6D          ;
+       jmp  handle_wave_outcoming_1    ; JR $8C6D          ;
 
 * When wave is initiating
 *
@@ -2107,8 +2109,7 @@ handle_wave_outcoming:                 ; >8c68
        .ret                            ;
 !
 * This entry point is used by the routine at #R$8C52.
-_8c6d:                                 ; >8c6d
-       equ  $
+handle_wave_outcoming_1:                                 ; >8c6d
        mov  @wave_data_address,iy      ; LD IY,($725D)     ; Get wave data address
        .push iy                        ; PUSH IY           ; Save pointer
        movb @>02(iy),a                 ; LD A,(IY+$02)     ; Get byte 3
@@ -2117,26 +2118,26 @@ _8c6d:                                 ; >8c6d
 ;       sla  a,1                        ; RLCA              ; ...
        srl  a,5
        andi a,>0700                    ; AND $07           ; And isolate them
-       .push af                        ; PUSH AF           ;
-       .call @stage_data_addr          ; CALL $84DB        ; Get stage data address in IY
-       .pop af                         ; POP AF            ;
+;       .push af                        ; PUSH AF           ;
+       bl   @stage_data_addr           ; CALL $84DB        ; Get stage data address in IY
+;       .pop af                         ; POP AF            ;
        ab   *iy,a                      ; ADD A,(IY+$00)    ; Add 2 times stage speed
        ab   *iy,a                      ; ADD A,(IY+$00)    ; ...
        movb a,@wave_speed_counter      ; LD ($725B),A      ; Store as new speed counter value
        .pop iy                         ; POP IY            ; Restore wave data address
        movb @bytes+>0e,b               ; LD B,$0E          ; Default sprite type (enemy)
        movb @status_flags,a            ; LD A,($71EB)      ; Is it chance stage?
-       movb a,r0                       ; BIT 3,A           ; ...
-       andi r0,>0800                   ;
-       jeq  _8ca2                      ; JR Z,$8CA2        ; If not, skip ahead
+       czc  @bits+3,a                  ; BIT 3,A           ; ...
+       jeq  handle_wave_outcoming_2    ; JR Z,$8CA2        ; If not, skip ahead
        movb @stage,a                   ; LD A,($7200)      ; Get stage
        andi a,>fc00                    ; AND $FC           ; Isolate planet index bits
-       li   hl,wave                    ; LD HL,$7201       ; Add wave
-       ab   *hl,a                      ; ADD A,(HL)        ; ...
+;       li   hl,wave                    ; LD HL,$7201       ; Add wave
+;       ab   *hl,a                      ; ADD A,(HL)        ; ...
+       ab   @wave,a
        li   hl,enemies_by_wave_table-1 ; LD HL,$8E0C       ; Table at #R$8E0D - 1
        .rst >08                        ; RST $08           ; Add A (1-24) to HL
        movb *hl,b                      ; LD B,(HL)         ; Get table value
-_8ca2:                                 ; >8ca2
+handle_wave_outcoming_2:               ; >8ca2
        .rst >28                        ; RST $28           ; Allocate sprite
        movb b,*ix                      ; LD (IX+$00),B     ; Set sprite type
        movb @>03(iy),a                 ; LD A,(IY+$03)     ; Get wave data byte 3
@@ -2153,15 +2154,15 @@ _8ca2:                                 ; >8ca2
        sb   b,b                        ; LD B,$00          ; ...
        li   hl,wave_init_polar_y       ; LD HL,$A57E       ; Table base address
        a    bc,hl                      ; ADD HL,BC         ; Table address
-       movb *hl,a                      ; LD A,(HL)         ; Get table byte
-       movb a,@>01(ix)                 ; LD (IX+$01),A     ; Save as polar y
+;       movb *hl,a                      ; LD A,(HL)         ; Get table byte
+;       movb a,@>01(ix)                 ; LD (IX+$01),A     ; Save as polar y
+       movb *hl,@>01(ix)
        movb @outcoming_enemies,a       ; LD A,($725C)      ; Outcoming enemies
        movb *iy,@c                     ; LD C,(IY+$00)     ; Get wave data byte 0
-       movb a,r0                       ; BIT 0,A           ; Even number of outcoming enemies?
-       andi r0,>0100                   ;
-       jeq  _8ccf                      ; JR Z,$8CCF        ; Skip ahead if so
+       czc  @bit0,a                    ; BIT 0,A           ; Even number of outcoming enemies?
+       jeq  handle_wave_outcoming_3    ; JR Z,$8CCF        ; Skip ahead if so
        movb @>01(iy),@c                ; LD C,(IY+$01)     ; Get wave data byte 1
-_8ccf:                                 ; >8ccf
+handle_wave_outcoming_3:               ; >8ccf
        movb @c,a                       ; LD A,C            ; A = wave data byte
        andi a,>7f00                    ; AND $7F           ; Clear bit 7
        movb a,@>02(ix)                 ; LD (IX+$02),A     ; Save as polar x
@@ -2196,11 +2197,10 @@ _8ccf:                                 ; >8ccf
        ab   one,@outcoming_enemies
        movb @bytes+>09,b               ; LD B,$09          ; B = 9 enemies
        movb @status_flags,a            ; LD A,($71EB)      ; Is it chance stage?
-       movb a,r0                       ; BIT 3,A           ; ...
-       andi r0,>0800                   ;
-       jeq  _8d0d                      ; JR Z,$8D0D        ; If not, skip ahead
+       czc  @bit3,a                    ; BIT 3,A           ; ...
+       jeq  handle_wave_outcoming_4    ; JR Z,$8D0D        ; If not, skip ahead
        movb @bytes+>0a,b               ; LD B,$0A          ; Else B = 10 enemies
-_8d0d:                                 ; >8d0d
+handle_wave_outcoming_4:               ; >8d0d
 ;       movb *hl,a                      ; LD A,(HL)         ; Increased outcoming enemies
 ;       cb   a,b                        ; CP B              ; Compare with 9 or 10
        cb   @outcoming_enemies,b
@@ -2211,7 +2211,7 @@ _8d0d:                                 ; >8d0d
        movb @zero,@outcoming_enemies
        li   hl,other_flags             ; LD HL,$7256       ; Clear flag that was set
        szcb @bits+6,*hl                ; RES 6,(HL)        ; when the wave started
-       .call @stage_data_addr          ; CALL $84DB        ; Get stage data address in IY
+       bl   @stage_data_addr           ; CALL $84DB        ; Get stage data address in IY
        movb @>06(iy),a                 ; LD A,(IY+$06)     ; Set countdown
        movb a,@countdown_to_wave       ; LD ($71F0),A      ; ...
        .ret                            ; RET               ;
@@ -2221,23 +2221,19 @@ _8d0d:                                 ; >8d0d
 * Used by the routine at #R$8170.
 reset_outcoming_enemies:               ; >8d21
        movb @status_flags,a            ; LD A,($71EB)      ; Are all waves completed?
-       movb a,r0                       ; BIT 1,A           ; ...
-       andi r0,>0200                   ;
-       jeq  !                          ; RET NZ            ; Then return
-       .ret                            ;
-!
+       czc  @bit1,a                    ; BIT 1,A           ; ...
+       jne  reset_outcoming_enemies_2  ; RET NZ            ; Then return
        movb @outcoming_enemies,a       ; LD A,($725C)      ; Outcoming enemies
 ;       socb a,a                        ; OR A              ; If none
-       jne  !                          ; RET Z             ; Then return
-       .ret                            ;
-!
+       jeq  reset_outcoming_enemies_2  ; RET Z             ; Then return
        movb a,b                        ; LD B,A            ; B = outcoming enemies
        movb @bytes+>09,a               ; LD A,$09          ; B = 9 - outcoming enemies
        sb   b,a                        ; SUB B             ; ...
        movb a,b                        ; LD B,A            ; ...
-       li   hl,total_enemies           ; LD HL,$7206       ; Total enemies
-       ab   *hl,a                      ; ADD A,(HL)        ; Add outcoming enemies
-       movb a,*hl                      ; LD (HL),A         ; Save again
+;       li   hl,total_enemies           ; LD HL,$7206       ; Total enemies
+;       ab   *hl,a                      ; ADD A,(HL)        ; Add outcoming enemies
+;       movb a,*hl                      ; LD (HL),A         ; Save again
+       ab   a,@total_enemies
        mov  @wave_data_address,iy      ; LD IY,($725D)     ; Wave data address
        movb @>03(iy),a                 ; LD A,(IY+$03)     ; Get bits 4-7 of byte 3
 ;       srl  a,1                        ; RRA               ; Shift bits 4-7 into bits 0-4
@@ -2246,13 +2242,14 @@ reset_outcoming_enemies:               ; >8d21
 ;       srl  a,1                        ; RRA               ; ...
        srl  a,4
        andi a,>0f00                    ; AND $0F           ; ...
-_8d43:                                 ; >8d43
+reset_outcoming_enemies_1:                                 ; >8d43
        .call @allocate_map_entry       ; CALL $AAA6        ; Return enemies to center
        sb   one,b                      ; DJNZ $8D43        ; ...
-       jne  _8d43                      ;
+       jne  reset_outcoming_enemies_1                      ;
        sb   a,a                        ; XOR A             ; Reset outcoming enemies
        movb a,@outcoming_enemies       ; LD ($725C),A      ; ...
        movb a,@countdown_to_wave       ; LD ($71F0),A      ; Reset countdown to wave
+reset_outcoming_enemies_2:
        .ret                            ; RET               ;
 
 * Create "laser fence" or meteor
@@ -2280,7 +2277,7 @@ create_laser_fence_or_meteor:          ; >8d50
        jeq  !                          ; RET NZ            ; If it's still not zero then return
        .ret                            ;
 !
-       .call @stage_data_addr          ; CALL $84DB        ; Get stage data address in IY
+       bl   @stage_data_addr           ; CALL $84DB        ; Get stage data address in IY
        .rst >20                        ; RST $20           ; Random number
        andi a,>e000                    ; AND $E0           ; If any of 3 bits are set
        jne  create_meteor              ; JR NZ,$8DD7       ; Then jump to create meteor
@@ -2520,7 +2517,7 @@ _8ec2:                                 ; >8ec2
        ab   one,a                      ; INC A             ;
        movb a,@mine_countdown_to_shoot ; LD ($7269),A      ; Set countdown to shoot to 1
        .call @_900e                    ; CALL $900E        ; Create shot from mine
-       .call @stage_data_addr          ; CALL $84DB        ; Get stage data address in IY
+       bl   @stage_data_addr           ; CALL $84DB        ; Get stage data address in IY
        movb @>05(iy),a                 ; LD A,(IY+$05)     ;
        movb a,@mines_time_left         ; LD ($7263),A      ;
        movb @bytes+>07,a               ; LD A,$07          ; Play sound
@@ -2699,7 +2696,7 @@ _900e:                                 ; >900e
        movb a,@>02(ix)                 ; LD (IX+$02),A     ; ...
        .rst >30                        ; RST $30           ; Load sprite pattern
 _9039:                                 ; >9039
-       .call @stage_data_addr          ; CALL $84DB        ; Get stage data address in IY
+       bl   @stage_data_addr           ; CALL $84DB        ; Get stage data address in IY
        .rst >20                        ; RST $20           ; Random number
        andi a,>3f00                    ; AND $3F           ; 0-63
        ab   @>06(iy),a                 ; ADD A,(IY+$06)    ; Add ?
@@ -3170,59 +3167,60 @@ handle_collisions:                     ; >9796
        movb a,b                        ; LD B,A            ; Loop counter for allocated sprites - 2
        li   hl,sprite_allocation_table+>0002 ; LD HL,$7185       ; Table address #R$7183+2 (skip ship sprites)
        sb   a,a                        ; XOR A             ; Reset a flag
-       movb a,@offset_double_shot_flag ; LD ($726E),A      ; ...
-_97a4:                                 ; >97a4
+       movb a,@offer_double_shot_flag  ; LD ($726E),A      ; ...
+handle_collisions_1:                   ; >97a4
        .push hl                        ; PUSH HL           ; Loop start; Save table address
        .push bc                        ; PUSH BC           ; Save counter
-       movb *hl,@l                     ; LD L,(HL)         ; Get sprites allocation table byte
-       sb   h,h                        ; LD H,$00          ; MSB = 0
-       a    hl,hl                      ; ADD HL,HL         ; x4
-       a    hl,hl                      ; ADD HL,HL         ; ...
-       movb h,d                        ; LD D,H            ; DE = x4
-       movb @l,@e                      ; LD E,L            ; ...
-       a    hl,hl                      ; ADD HL,HL         ; x8
-       a    de,hl                      ; ADD HL,DE         ; x12
-       .ex_de_hl                       ; EX DE,HL          ; DE = x12
+;       movb *hl,@l                     ; LD L,(HL)         ; Get sprites allocation table byte
+;       sb   h,h                        ; LD H,$00          ; MSB = 0
+;       a    hl,hl                      ; ADD HL,HL         ; x4
+;       a    hl,hl                      ; ADD HL,HL         ; ...
+;       movb h,d                        ; LD D,H            ; DE = x4
+;       movb @l,@e                      ; LD E,L            ; ...
+;       mov  hl,de
+;       a    hl,hl                      ; ADD HL,HL         ; x8
+;       a    de,hl                      ; ADD HL,DE         ; x12
+;       .ex_de_hl                       ; EX DE,HL          ; DE = x12
+       clr  de
+       movb *hl,@e
+       li   hl,12
+       mpy  hl,de
        li   ix,sprite_data             ; LD IX,$7002       ; Sprite data table base
-       a    de,ix                      ; ADD IX,DE         ; Add offset so that IX = current sprite data
+       a    hl,ix                      ; ADD IX,DE         ; Add offset so that IX = current sprite data
        movb *ix,a                      ; LD A,(IX+$00)     ; Get sprite type
        cb   a,@bytes+>7f               ; CP $7F            ; If deallocated value
-       jeq  _97f3                      ; JR Z,$97F3        ; Then move to next sprite
+       jeq  handle_collisions_2        ; JR Z,$97F3        ; Then move to next sprite
        movb @>01(ix),r0                ; BIT 7,(IX+$01)    ; If bit 7 of polar y is set
-       andi r0,>8000                   ;
-       jne  _97f3                      ; JR NZ,$97F3       ; Then move to next sprite
+       jlt  handle_collisions_2        ; JR NZ,$97F3       ; Then move to next sprite
        cb   a,@bytes+>02               ; CP $02            ; Is it a shot?
        jne  !                          ; JP Z,$9861        ; Then jump to handler
        b    @handle_shot_collision     ;
 !
        cb   a,@bytes+>0d               ; CP $0D            ; Is it < $0D (numbers or destroyed enemy)?
-       jl   _97f3                      ; JR C,$97F3        ; Then move on to next sprite
+       jl   handle_collisions_2        ; JR C,$97F3        ; Then move on to next sprite
        movb @status_flags,a            ; LD A,($71EB)      ; Is it chance stage?
-       movb a,r0                       ; BIT 3,A           ; ...
-       andi r0,>0800                   ;
-       jne  _97f3                      ; JR NZ,$97F3       ; Then move to next sprite
+       czc  @bit3,a                    ; BIT 3,A           ; ...
+       jne  handle_collisions_2        ; JR NZ,$97F3       ; Then move to next sprite
        movb @>07(ix),r0                ; BIT 7,(IX+$07)    ; If the flag bit 7 set in sprite data
-       andi r0,>8000                   ;
-       jne  _97f3                      ; JR NZ,$97F3       ; Then move to next sprite
+       jlt  handle_collisions_2        ; JR NZ,$97F3       ; Then move to next sprite
        li   iy,sprite_data             ; LD IY,$7002       ; Ship sprite data
-       movb @>01(ix),a                 ; LD A,(IX+$01)     ; Is polar x = ship x?
-       cb   a,@>01(iy)                 ; CP (IY+$01)       ; ...
-       jne  _97f3                      ; JR NZ,$97F3       ; If not, move to next sprite
+;       movb @>01(ix),a                 ; LD A,(IX+$01)     ; Is polar x = ship x?
+;       cb   a,@>01(iy)                 ; CP (IY+$01)       ; ...
+       cb   @>01(ix),@>01(iy)
+       jne  handle_collisions_2        ; JR NZ,$97F3       ; If not, move to next sprite
        movb @>02(ix),a                 ; LD A,(IX+$02)     ; Polar x for sprite
        movb @>02(iy),b                 ; LD B,(IY+$02)     ; Polar x for ship
-       .call @polar_x_distance         ; CALL $9A86        ; Polar x distance
+       bl   @polar_x_distance          ; CALL $9A86        ; Polar x distance
        cb   a,@bytes+>02               ; CP $02            ; Is distance < 2
-       jhe  !                          ; JP C,$9A38        ; Then jump to collision handler
+       jhe  handle_collisions_2        ; JP C,$9A38        ; Then jump to collision handler
        b    @ship_hit_sprite           ;
-!
 * This entry point is used by the routines at #R$9861, #R$9978 and #R$9A49.
-_97f3:                                 ; >97f3
-       equ  $
+handle_collisions_2:                                 ; >97f3
        .pop bc                         ; POP BC            ; Restore counter
        .pop hl                         ; POP HL            ; Restore table address
        inc  hl                         ; INC HL            ; Next table address
        sb   one,b                      ; DJNZ $97A4        ; Loop for each allocated sprites (except ship)
-       jne  _97a4                      ;
+       jne  handle_collisions_1                      ;
        movb @mines_left,a              ; LD A,($722D)      ; Are there any mines left?
 ;       socb a,a                        ; OR A              ; ...
        jeq  _982e                      ; JR Z,$982E        ; Skip ahead if not
@@ -3240,7 +3238,7 @@ _980b:                                 ; >980b
        jhe  _9829                      ; JR NC,$9829       ; Then move to next mine
        movb @>02(ix),a                 ; LD A,(IX+$02)     ; Get ship polar x
        movb @>08(iy),b                 ; LD B,(IY+$08)     ; Get mine polar x
-       .call @polar_x_distance         ; CALL $9A86        ; Polar x distance
+       bl   @polar_x_distance          ; CALL $9A86        ; Polar x distance
        cb   a,@bytes+>07               ; CP $07            ; If < 7
        jhe  _9829
        .call @ship_hit_mine            ; CALL C,$9A75      ; Then call collision routine
@@ -3250,7 +3248,7 @@ _9829:                                 ; >9829
        sb   one,b                      ; DJNZ $980B        ; Loop for 3 mines
        jne  _980b                      ;
 _982e:                                 ; >982e
-       movb @offset_double_shot_flag,a ; LD A,($726E)      ; Check a flag
+       movb @offer_double_shot_flag,a ; LD A,($726E)      ; Check a flag
        movb a,r0                       ; BIT 0,A           ; ...
        andi r0,>0100                   ;
        jne  !                          ; RET Z             ; Return if not
@@ -3325,7 +3323,7 @@ _9891:                                 ; >9891
        jeq  _98b5                      ; JR Z,$98B5        ; If not, we need a precise match on x
        .push bc                        ; PUSH BC           ; Save counter
        movb @>02(ix),b                 ; LD B,(IX+$02)     ; Polar x other sprite
-       .call @polar_x_distance         ; CALL $9A86        ; Polar x distance
+       bl   @polar_x_distance          ; CALL $9A86        ; Polar x distance
        .pop bc                         ; POP BC            ; Restore counter
        cb   a,@bytes+>03               ; CP $03            ; If distance < 3
        jhe  !                          ; JP C,$9924        ; Then we have a hit
@@ -3394,7 +3392,7 @@ _98f7:                                 ; >98f7
        .push bc                        ; PUSH BC           ; Save counter
        movb @>08(iy),a                 ; LD A,(IY+$08)     ; Get polar x of mine
        movb @>02(ix),b                 ; LD B,(IX+$02)     ; Get polar x of shot
-       .call @polar_x_distance         ; CALL $9A86        ; Polar x distance
+       bl   @polar_x_distance          ; CALL $9A86        ; Polar x distance
        .pop bc                         ; POP BC            ; Restore counter
        cb   a,@bytes+>04               ; CP $04            ; If distance is < 4
        jhe  !                          ; JP C,$99B1        ; Then we have a hit
@@ -3405,7 +3403,7 @@ _991d:                                 ; >991d
        a    de,iy                      ; ADD IY,DE         ; Next mine address
        sb   one,b                      ; DJNZ $98F7        ; Loop for 3 mines
        jne  _98f7                      ;
-       b    @_97f3                     ; JP $97F3          ; Jump back into collisions loop
+       b    @handle_collisions_2                     ; JP $97F3          ; Jump back into collisions loop
 
 * Shot hit sprite
 *
@@ -3496,7 +3494,7 @@ _998d:                                 ; >998d
 add_points_in_de:                      ; >9999
        .ex_de_hl                       ; EX DE,HL          ; HL = points
        .call @add_score                ; CALL $A6EC        ; Add score
-       b    @_97f3                     ; JP $97F3          ; Jump back into collisions loop
+       b    @handle_collisions_2                     ; JP $97F3          ; Jump back into collisions loop
 
 * Shot hit center enemy
 *
@@ -3531,7 +3529,7 @@ shot_hit_mine:                         ; >99b1
        movb a,r0                       ; BIT 1,A           ; ...
        andi r0,>0200                   ;
        jne  _99d3                      ; JR NZ,$99D3       ; Then skip offering double shot
-       li   hl,offset_double_shot_flag ; LD HL,$726E       ; Set flag for offering double shot
+       li   hl,offer_double_shot_flag  ; LD HL,$726E       ; Set flag for offering double shot
        socb @bits+0,*hl                ; SET 0,(HL)        ; ...
        li   de,>0500                   ; LD DE,$0500       ; Points
        jmp  _99ea                      ; JR $99EA          ; Jump ahead
@@ -3642,7 +3640,7 @@ _9a69:                                 ; >9a69
 _9a6d:                                 ; >9a6d
        li   hl,status_flags            ; LD HL,$71EB       ; Set died flag
        socb @bits+2,*hl                ; SET 2,(HL)        ; ...
-       b    @_97f3                     ; JP $97F3          ; Jump back into collisions loop
+       b    @handle_collisions_2                     ; JP $97F3          ; Jump back into collisions loop
 
 * Collision of ship with mine
 *
@@ -3665,33 +3663,32 @@ ship_hit_mine:                         ; >9a75
 * I: A Polar x1
 * I: B Polar x2
 polar_x_distance:                      ; >9a86
-       movb a,@temp_polar_x            ; LD ($726F),A      ; Store polar x1
+       movb a,r0                       ; LD ($726F),A      ; Store polar x1
        sb   b,a                        ; SUB B             ; Polar x1 - polar x2
 ;       jnc  _9a8e                      ; JR NC,$9A8E       ; Jump ahead of >= 0
 ;       neg a                           ; NEG               ; Else make positive
 ;_9a8e:                                 ; >9a8e
        abs  a
        cb   a,@bytes+>20               ; CP $20            ; Is it < 32?
-       jhe  !                          ; RET C             ; Then return
-       .ret                            ;
-!
-       movb @temp_polar_x,a            ; LD A,($726F)      ; Restore polar x1
+       jl   polar_x_distance_3         ; RET C             ; Then return
+       movb r0,a                       ; LD A,($726F)      ; Restore polar x1
        cb   a,@bytes+>20               ; CP $20            ; Is it >= 32?
-       jhe  _9a9a                      ; JR NC,$9A9A       ; Then skip ahead
+       jhe  polar_x_distance_1         ; JR NC,$9A9A       ; Then skip ahead
        ab   @bytes+>40,a               ; ADD A,$40         ; Else add 64
-_9a9a:                                 ; >9a9a
-       movb a,@c                       ; LD C,A            ; Store in C
+polar_x_distance_1:                    ; >9a9a
+       movb a,r0                       ; LD C,A            ; Store in C
        movb b,a                        ; LD A,B            ; Get polar x2
        cb   a,@bytes+>20               ; CP $20            ; Is it >= 32?
-       jhe  _9aa2                      ; JR NC,$9AA2       ; Then skip ahead
+       jhe  polar_x_distance_2         ; JR NC,$9AA2       ; Then skip ahead
        ab   @bytes+>40,a               ; ADD A,$40         ; Else add 64
-_9aa2:                                 ; >9aa2
-       sb   @c,a                       ; SUB C             ; Subtract the modified polar x1
-       jlt  !                          ; RET NC            ; Return if >= 0
-       .ret                            ;
-!
+polar_x_distance_2:                    ; >9aa2
+       movb a,r1
+       sb   r0,a                       ; SUB C             ; Subtract the modified polar x1
+       cb   r0,r1
+       jhe  polar_x_distance_3         ; RET NC            ; Return if >= 0
        neg a                           ; NEG               ; Else make positive
-       .ret                            ; RET               ; And return
+polar_x_distance_3:
+       rt                              ; RET               ; And return
 
 * Score table
 score_table:                           ; >9aa7
@@ -4362,40 +4359,40 @@ allocate_map_entry:                    ; >aaa6
        .push af                        ; PUSH AF           ; Save value to write
        movb @center_map_entries,a      ; LD A,($722B)      ; Get number of entries
        cb   a,@bytes+>24               ; CP $24            ; If map is full
-       jeq  _aade                      ; JR Z,$AADE        ; Then return
+       jeq  allocate_map_entry_6       ; JR Z,$AADE        ; Then return
        movb @status_flags,a            ; LD A,($71EB)      ; If all waves completed flag is set
-       movb a,r0                       ; BIT 1,A           ; The search backwards
-       andi r0,>0200                   ;
-       jne  _aac6                      ; JR NZ,$AAC6       ; Else search forwards
+       czc  @bit1,a                    ; BIT 1,A           ; The search backwards
+       jne  allocate_map_entry_3       ; JR NZ,$AAC6       ; Else search forwards
        li   hl,center_enemy_map+>0023  ; LD HL,$722A       ; Start at end of #R$7207
        movb @b255,a                    ; LD A,$FF          ; Byte to search for
-_aabd:                                 ; >aabd
+allocate_map_entry_1:                  ; >aabd
        cb   a,*hl                      ; CP (HL)           ; Check byte
-       jne  _aac3                      ; JR NZ,$AAC3       ; Break out if not $FF
+       jne  allocate_map_entry_2       ; JR NZ,$AAC3       ; Break out if not $FF
        dec  hl                         ; DEC HL            ; Previous address
-       jmp  _aabd                      ; JR $AABD          ; Loop forever
-_aac3:                                 ; >aac3
+       jmp  allocate_map_entry_1       ; JR $AABD          ; Loop forever
+allocate_map_entry_2:                  ; >aac3
        inc  hl                         ; INC HL            ; HL now points to group of $FF at the end of buffer
-       jmp  _aad1                      ; JR $AAD1          ; Skip next loop
-_aac6:                                 ; >aac6
+       jmp  allocate_map_entry_5       ; JR $AAD1          ; Skip next loop
+allocate_map_entry_3:                  ; >aac6
        li   hl,center_enemy_map        ; LD HL,$7207       ; Start at beginning of #R$7207
        movb @b255,a                    ; LD A,$FF          ; Byte to search for
-_aacb:                                 ; >aacb
+allocate_map_entry_4:                  ; >aacb
        cb   a,*hl                      ; CP (HL)           ; Check byte
-       jeq  _aad1                      ; JR Z,$AAD1        ; Break out if found HL now points to first $FF in buffer
+       jeq  allocate_map_entry_5       ; JR Z,$AAD1        ; Break out if found HL now points to first $FF in buffer
        inc  hl                         ; INC HL            ; Next address
-       jmp  _aacb                      ; JR $AACB          ; Loop forever
-_aad1:                                 ; >aad1
+       jmp  allocate_map_entry_4       ; JR $AACB          ; Loop forever
+allocate_map_entry_5:                  ; >aad1
        .pop af                         ; POP AF            ; Restore value to write
        movb a,*hl                      ; LD (HL),A         ; Set byte to A
-       li   hl,center_map_entries      ; LD HL,$722B       ; Increment number of entries
-       ab   one,*hl                    ; INC (HL)          ; ...
+;       li   hl,center_map_entries      ; LD HL,$722B       ; Increment number of entries
+;       ab   one,*hl                    ; INC (HL)          ; ...
+       ab   one,@center_map_entries
        li   hl,center_enemies_redraw   ; LD HL,$72CC       ; Set flag
        socb @bits+0,*hl                ; SET 0,(HL)        ; ...
-       jmp  _aadf                      ; JR $AADF          ; Skip popping AF
-_aade:                                 ; >aade
+       jmp  allocate_map_entry_7       ; JR $AADF          ; Skip popping AF
+allocate_map_entry_6:                  ; >aade
        .pop af                         ; POP AF            ;
-_aadf:                                 ; >aadf
+allocate_map_entry_7:                  ; >aadf
        .pop bc                         ; POP BC            ;
        .pop de                         ; POP DE            ;
        .pop hl                         ; POP HL            ;
@@ -4428,7 +4425,7 @@ create_sprite_from_map_entry:          ; >aaf1
        jeq  create_sprite_from_map_entry_2 ; RET Z             ; Return if not
        czc  @bit2,a                    ; BIT 2,A           ; Is died flag set?
        jne  create_sprite_from_map_entry_2 ; RET NZ            ; Return if so
-       .call @stage_data_addr          ; CALL $84DB        ; Get stage data address in IY
+       bl   @stage_data_addr           ; CALL $84DB        ; Get stage data address in IY
        movb @active_enemies,a          ; LD A,($722C)      ; Get number of active enemies
        cb   a,@>04(iy)                 ; CP (IY+$04)       ; Compare with byte 4 of stage data
        jhe  create_sprite_from_map_entry_2 ; RET NC            ; Return if active enemies >= byte 4

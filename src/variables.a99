@@ -411,7 +411,7 @@ decompress_source_byte:                   ; >726d
        byte >00
 
 * Flag for showing double shot pickup
-offset_double_shot_flag:               ; >726e
+offer_double_shot_flag:               ; >726e
        byte >00
 
 * Temporary polar x
