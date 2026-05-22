@@ -865,7 +865,7 @@ game_over_msg:                         ; >85dd
 process_sprites:                       ; >85e6
        li   hl,sprite_countdown        ; LD HL,$71EE       ; Decrement counter 1
        sb   one,*hl                    ; DEC (HL)          ; ...
-       li   hl,attack_countdown      ; LD HL,$7260       ; Decrement counter 2
+       li   hl,attack_countdown        ; LD HL,$7260       ; Decrement counter 2
        sb   one,*hl                    ; DEC (HL)          ; ...
        movb @countdown_to_shoot,a      ; LD A,($71EF)      ; Decrement counter stopping at 0
        sb   one,a                      ; DEC A             ; ...
@@ -893,35 +893,40 @@ process_next_sprite:                   ; >8600
        b    @all_sprites_processed     ;
 !
        .push hl                        ; PUSH HL           ; Push allocation table address
-       movb *hl,@l                     ; LD L,(HL)         ; Get sprite data table index
-       sb   h,h                        ; LD H,$00          ; ...
+;       movb *hl,@l                     ; LD L,(HL)         ; Get sprite data table index
+;       sb   h,h                        ; LD H,$00          ; ...
 ;       a    hl,hl                      ; ADD HL,HL         ; Multiply by 4
 ;       a    hl,hl                      ; ADD HL,HL         ; ...
-       sla  hl,2
+;       sla  hl,2
 ;       movb h,d                        ; LD D,H            ; Store in DE
 ;       movb @l,@e                      ; LD E,L            ; ...
-       mov  hl,de
-       a    hl,hl                      ; ADD HL,HL         ; Multiplied by 8
-       a    de,hl                      ; ADD HL,DE         ; Multiplied by 12
-       .ex_de_hl                       ; EX DE,HL          ; DE = sprite data table offset
+;       mov  hl,de
+;       a    hl,hl                      ; ADD HL,HL         ; Multiplied by 8
+;       a    de,hl                      ; ADD HL,DE         ; Multiplied by 12
+;       .ex_de_hl                       ; EX DE,HL          ; DE = sprite data table offset
+       clr  de
+       movb *hl,@e
+       li   hl,12
+       mpy  hl,de
        li   ix,sprite_data             ; LD IX,$7002       ; Base sprite data table address
-       a    de,ix                      ; ADD IX,DE         ; IX = sprite data table address
+       a    hl,ix                      ; ADD IX,DE         ; IX = sprite data table address
        li   hl,return_from_sprite_handler ; LD HL,$8A41       ; Push return address of routine at #R$8A41
        .push hl                        ; PUSH HL           ; ...
        movb *ix,a                      ; LD A,(IX+$00)     ; Get sprite type
        movb a,@>05(ix)                 ; LD (IX+$05),A     ; Copy it to byte 5
        cb   a,@bytes+>7f               ; CP $7F            ; Is it to be deallocated?
-       jeq  !                          ; JP NZ,$865A       ; If not, jump ahead
-       b    @handle_sprite_type_02     ;
-!                                      ; Continue into deallocate_sprite
+       jeq  deallocate_sprite          ; JP NZ,$865A       ; If not, jump ahead
+       jmp  handle_sprite_type_02      ;
+                                       ; Continue into deallocate_sprite
 * This entry point is used by the routines at #R$8654, #R$8673, #R$867D and
 * #R$8815.
 deallocate_sprite:                     ; >862f
        movb @b255,*ix                  ; LD (IX+$00),$FF   ; Set as not allocated
        .pop hl                         ; POP HL            ; Pop return address
-       .pop hl                         ; POP HL            ; Restore allocation table address of sprite to be
-                                                           ; deallocated
-       .push hl                        ; PUSH HL           ; Push it again
+;       .pop hl                         ; POP HL            ; Restore allocation table address of sprite to be
+;                                                           ; deallocated
+;       .push hl                        ; PUSH HL           ; Push it again
+       .peek hl
        li   de,sprite_allocation_table ; LD DE,$7183       ; Sprite allocation table
 ;      sb   a,a                        ; XOR A             ; Clear carry
        s    de,hl                      ; SBC HL,DE         ; HL = offset into table
@@ -930,19 +935,20 @@ deallocate_sprite:                     ; >862f
        movb a,@allocated_sprites       ; LD ($7182),A      ; ...
        sb   @l,a                       ; SUB L             ; Allocated sprites - offset = number of allocations
                                                            ; after this one
-       jeq  _8650                      ; JR Z,$8650        ; If it was the last one, there's nothing to do
+       jeq  deallocate_sprite_1        ; JR Z,$8650        ; If it was the last one, there's nothing to do
        movb a,@c                       ; LD C,A            ; BC = number of allocations to move
        sb   b,b                        ; LD B,$00          ; ...
-       .pop de                         ; POP DE            ; DE = allocation table address
-       .push de                        ; PUSH DE           ; ...
+;       .pop de                         ; POP DE            ; DE = allocation table address
+;       .push de                        ; PUSH DE           ; ...
+       .peek de
 ;       movb d,h                        ; LD H,D            ; HL = allocation table address
 ;       movb @e,@l                      ; LD L,E            ; ...
        mov  de,hl
        inc  hl                         ; INC HL            ; HL = allocation table address + 1
        .ldir                           ; LDIR              ; Copy allocations after to close hole
-_8650:                                 ; >8650
+deallocate_sprite_1:                   ; >8650
        .pop hl                         ; POP HL            ; Restore allocation table address
-       b    @process_next_sprite       ; JP $8600          ; Proceed with next sprite
+       jmp  process_next_sprite        ; JP $8600          ; Proceed with next sprite
 
 * Deallocate enemy
 *
@@ -1250,7 +1256,7 @@ move_to_center_1:                      ; >87e7
 ;      Found
 move_to_center_2:                      ; >87f5
        dec  hl
-       bl   @polar_coord_from_map     ; CALL $AB38        ; Now DE contains polar y,x
+       bl   @polar_coord_from_map      ; CALL $AB38        ; Now DE contains polar y,x
        movb @e,a                       ; LD A,E            ; Get x from map
        cb   a,@>02(ix)                 ; CP (IX+$02)       ; Compare with polar x
        jeq  move_to_center_3           ; JR Z,$8801        ; If same, skip ahead
@@ -1321,7 +1327,7 @@ handle_out_of_screen_2:                ; >8848
        jeq  handle_out_of_screen_3     ; JR Z,$8853        ; If not set, skip ahead
        .rst >20                        ; RST $20           ; Random number
        andi a,>0300                    ; AND $03           ; 0 - 3
-       jne  handle_out_of_screen_1     ; JR NZ,$883B       ; If not 0, jump back
+       jne  handle_out_of_screen_1     ; JR NZ,$883B       ; If not 0, reset to center
 handle_out_of_screen_3:                ; >8853
 ;       li   hl,active_enemies          ; LD HL,$722C       ; Decrement active enemies
 ;       sb   one,*hl                    ; DEC (HL)          ; ...
@@ -1725,24 +1731,23 @@ all_sprites_processed:                 ; >8a53
        bl   @stage_data_addr           ; CALL $84DB        ; Get stage data address in IY
        movb @sprite_countdown,a        ; LD A,($71EE)      ; Get sprite countdown
 ;       socb a,a                        ; OR A              ; Is it zero
-       jne  _8a62                      ; JR NZ,$8A62       ; No, skip ahead
+       jne  all_sprites_processed_1    ; JR NZ,$8A62       ; No, skip ahead
        movb *iy,a                      ; LD A,(IY+$00)     ; Reset to first byte of stage data (speed?)
        movb a,@sprite_countdown        ; LD ($71EE),A      ; ...
-_8a62:                                 ; >8a62
-       movb @attack_countdown,a      ; LD A,($7260)      ; Get sprite countdown 2
+all_sprites_processed_1:               ; >8a62
+       movb @attack_countdown,a        ; LD A,($7260)      ; Get sprite countdown 2
 ;       socb a,a                        ; OR A              ; Return if not zero
-       jeq  !                          ; RET NZ            ; ...
-       .ret                            ;
-!
+       jne  all_sprites_processed_3    ; RET NZ            ; ...
        movb @stage_data_index,a        ; LD A,($7203)      ; Get stage data index
 ;       cb   a,@bytes+>02               ; CP $02            ; Compare to 2
        movb a,r0
        movb *iy,a                      ; LD A,(IY+$00)     ; Get first byte of stage data (speed?)
        cb   a,@bytes+>02
-       jhe  _8a72                      ; JR NC,$8A72       ; If stage index >= 2, then skip ahead
+       jhe  all_sprites_processed_2    ; JR NC,$8A72       ; If stage index >= 2, then skip ahead
        ab   a,a                        ; ADD A,A           ; Else multiply by 2
-_8a72:                                 ; >8a72
-       movb a,@attack_countdown      ; LD ($7260),A      ; Save sprite countdown 2
+all_sprites_processed_2:               ; >8a72
+       movb a,@attack_countdown        ; LD ($7260),A      ; Save sprite countdown 2
+all_sprites_processed_3:
        .ret                            ; RET               ; Return from sprite processing
 
 * Create enemy shot if conditions are met
@@ -4851,6 +4856,7 @@ upload_sprite_data_1:                  ; >ad02
        cb   a,@bytes+>05               ; CP $05            ; Is it < 5
        jl   upload_sprite_data_2       ; RET C             ; Then return
 * Rotate sprite allocation table
+       jmp  upload_sprite_data_2       ; TODO: disabled
        sb   @bytes+>04,a               ; SUB $04           ;
        movb a,@c                       ; LD C,A            ; Number of sprites above 4
        sb   b,b                        ; LD B,$00          ;
@@ -5592,26 +5598,26 @@ polar_to_screen_5:                     ; >b217
        seto @carry                     ; SCF               ; Set carry flag
        jmp  polar_to_screen_4          ; JR $B212          ; To return
 
-* Random number generator (RST $20)
-*
-* Used by the routine at #R$8015.
-rnd:                                   ; >bfae
-       .push ix                        ; PUSH IX           ;
-       li   ix,random_number           ; LD IX,$731B       ; Last random number
-       movb *ix,a                      ; LD A,(IX+$00)     ; Get byte 0
-       sla  a,1                        ; RLCA              ; Rotate left
-       ; XOR (IX+$00)                  ; XOR (IX+$00)      ; Flip some bits
-       movb @1(ix),r0
-       xor  r0,a
-       srl  a,1                        ; RRCA              ; Rotate right
-       ab   one,@>01(ix)               ; INC (IX+$01)      ; Increment byte 1
-       ab   @>01(ix),a                 ; ADD A,(IX+$01)    ; Add byte 1
-       ; AND A                         ; AND A             ; Set flags
-       ; JP PE,$BFC9                   ; JP PE,$BFC9       ; Skip ahead if even parity
-       jop  !
-       jmp  rnd_1
-!      ab   one,@>01(ix)               ; INC (IX+$01)      ; Else increment byte 1
-rnd_1:                                 ; >bfc9
-       movb a,*ix                      ; LD (IX+$00),A     ; Set byte 0
-       .pop ix                         ; POP IX            ;
-       rt                              ; RET               ;
+;* Random number generator (RST $20)
+;*
+;* Used by the routine at #R$8015.
+;rnd:                                   ; >bfae
+;       .push ix                        ; PUSH IX           ;
+;       li   ix,random_number           ; LD IX,$731B       ; Last random number
+;       movb *ix,a                      ; LD A,(IX+$00)     ; Get byte 0
+;       sla  a,1                        ; RLCA              ; Rotate left
+;       ; XOR (IX+$00)                  ; XOR (IX+$00)      ; Flip some bits
+;       movb @1(ix),r0
+;       xor  r0,a
+;       srl  a,1                        ; RRCA              ; Rotate right
+;       ab   one,@>01(ix)               ; INC (IX+$01)      ; Increment byte 1
+;       ab   @>01(ix),a                 ; ADD A,(IX+$01)    ; Add byte 1
+;       ; AND A                         ; AND A             ; Set flags
+;       ; JP PE,$BFC9                   ; JP PE,$BFC9       ; Skip ahead if even parity
+;       jop  !
+;       jmp  rnd_1
+;!      ab   one,@>01(ix)               ; INC (IX+$01)      ; Else increment byte 1
+;rnd_1:                                 ; >bfc9
+;       movb a,*ix                      ; LD (IX+$00),A     ; Set byte 0
+;       .pop ix                         ; POP IX            ;
+;       rt                              ; RET               ;
