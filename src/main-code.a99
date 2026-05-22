@@ -94,7 +94,6 @@ _80e0:                                 ; >80e0
 *
 * Used by the routines at #R$81AE and #R$83D0.
 main_loop:                             ; >80e8
-       bl   @ti_vsync
 ;       li   hl,interrupt_flag          ; LD HL,$725A       ; Flag set by interrupt routine
 ;_80eb:                                 ; >80eb
 ;       movb *hl,r0                     ; BIT 0,(HL)        ; Test flag
@@ -102,7 +101,7 @@ main_loop:                             ; >80e8
 ;       jeq  _80eb                      ; JR Z,$80EB        ; Wait until set
 ;       szcb @bits+0,*hl                ; RES 0,(HL)        ; Clear flag
 ;       .call @read_register            ; CALL $1FDC        ; READ_REGISTER (read VDP status)
-;       .call @sound_player
+       .call @sound_player
        .call @display_stars            ; CALL $AFFF        ; Display stars
        .call @control_ship             ; CALL $A73C        ; Control ship
        .call @process_sprites          ; CALL $85E6        ; Process sprites
@@ -157,6 +156,7 @@ died_1:                                 ; >814f
        jeq  lose_life                  ; JR Z,$8170        ; When all are centered then jump to lose life
 died_2:                                ; >815e
        .halt                           ; HALT              ;
+       .call @sound_player
        .call @display_stars            ; CALL $AFFF        ; Display stars
        .call @process_sprites          ; CALL $85E6        ; Process sprites
        .call @create_or_display_mines  ; CALL $8E2D        ; Create or display mines
@@ -187,6 +187,7 @@ lose_life:                             ; >8170
 game_over_loop:                        ; >8192
        .push bc                        ; PUSH BC           ; ...
        .halt                           ; HALT              ; ...
+       .call @sound_player
        .call @display_stars            ; CALL $AFFF        ; Display stars
        .pop bc                         ; POP BC            ; ...
        sb   one,b                      ; DJNZ $8192        ; ...
@@ -462,9 +463,10 @@ stage_completed:                       ; >832a
 * This entry point is used by the routines at #R$8450 and #R$846B.
 stage_completed_1:                     ; >833c
        movb @bytes+>5a,b               ; LD B,$5A          ; 90
-stage_completed_2:                     ; >833e
+stage_completed_loop:                     ; >833e
        .push bc                        ; PUSH BC           ;
        .halt                           ; HALT              ; Wait interrupt
+       .call @sound_player
        .call @display_stars            ; CALL $AFFF        ; Display stars
        .call @control_ship             ; CALL $A73C        ; Control ship
        .call @process_sprites          ; CALL $85E6        ; Process sprites
@@ -472,7 +474,7 @@ stage_completed_2:                     ; >833e
        .call @next_frame_upl_sprites   ; CALL $84B1        ; Upload sprites
        .pop bc                         ; POP BC            ;
        sb   one,b                      ; DJNZ $833E        ; Loop for 90 frames
-       jne  stage_completed_2          ;
+       jne  stage_completed_loop          ;
        .call @stop_tune                ; CALL $9B87        ; Stop tune
        .call @clear_rows_9_and_14      ; CALL $84ED        ; Clear rows 9 and 14
        movb @stage,a                   ; LD A,($7200)      ; Stage
@@ -493,7 +495,7 @@ stage_completed_4:                     ; >836d
        movb a,b                        ; LD B,A            ; B = stage
        andi a,>0300                    ; AND $03           ; Stage mod 4
        cb   a,@bytes+>02               ; CP $02            ; If not planet reached (2)
-       jne  stage_completed_5          ; JR NZ,$838A       ; Then skip displaying planet
+       jne  warp_loop          ; JR NZ,$838A       ; Then skip displaying planet
        movb b,a                        ; LD A,B            ; Stage
 ;       srl  a,1                        ; SRL A             ; Divide by 4
 ;       srl  a,1                        ; SRL A             ; ...
@@ -502,8 +504,9 @@ stage_completed_4:                     ; >836d
        .call @display_planet           ; CALL $9175        ; Display planet A
        .call @upload_sprite_data       ; CALL $ACF9        ; Upload sprite data
 * Warp
-stage_completed_5:                     ; >838a
+warp_loop:                             ; >838a
        .halt                           ; HALT              ; Wait interrupt
+       .call @sound_player
        .call @display_stars            ; CALL $AFFF        ; Display stars
        .call @control_ship             ; CALL $A73C        ; Control ship
        .call @process_sprites          ; CALL $85E6        ; Process sprites
@@ -534,7 +537,7 @@ stage_completed_7:                     ; >83c2
        .call @display_ship_background_patterns ; CALL $A808        ; Display ship background patterns
 stage_completed_8:                     ; >83cb
        .call @next_frame_upl_sprites   ; CALL $84B1        ; Upload sprites
-       jmp  stage_completed_5          ; JR $838A          ; Loop
+       jmp  warp_loop          ; JR $838A          ; Loop
 
 * Next stage
 *
@@ -654,9 +657,10 @@ display_bonus_score_1:                 ; >8489
        movb @current_player,a          ; LD A,($71F1)      ; Current player
        .call @display_score            ; CALL $A699        ; Display score
        movb @bytes+>07,b               ; LD B,$07          ; 7 frames
-display_bonus_score_2:                 ; >8496
+bonus_score_loop:                 ; >8496
        .halt                           ; HALT              ; Wait for interrupt
        .push bc                        ; PUSH BC           ;
+       .call @sound_player
        .call @display_stars            ; CALL $AFFF        ; Display stars
        .call @control_ship             ; CALL $A73C        ; Control ship
        .call @process_sprites          ; CALL $85E6        ; Process sprites
@@ -664,7 +668,7 @@ display_bonus_score_2:                 ; >8496
        .call @next_frame_upl_sprites   ; CALL $84B1        ; Upload sprites
        .pop bc                         ; POP BC            ;
        sb   one,b                      ; DJNZ $8496        ; Loop 7 times
-       jne  display_bonus_score_2                      ;
+       jne  bonus_score_loop                      ;
        .pop bc                         ; POP BC            ;
        .pop hl                         ; POP HL            ;
        sb   one,b                      ; DJNZ $8489        ; Loop number of ships times
@@ -1794,14 +1798,16 @@ maybe_create_enemy_shot:               ; >8a76
 * I:A Polar x to move towards
 move_towards_x:                        ; >8ac0
        movb one,b                      ; LD B,$01          ; Direction = 1
+       movb a,r0
        sb   @>02(ix),a                 ; SUB (IX+$02)      ; Distance = desired x - x
        jeq  move_towards_x_3           ; RET Z             ; Return if same
-       jgt  move_towards_x_1           ; JR NC,$8ACC       ; Jump if distance > 0
+       cb   r0,@>02(ix)
+       jhe  move_towards_x_1           ; JR NC,$8ACC       ; Jump if distance > 0
        movb @b255,b                    ; LD B,$FF          ; Direction = -1
        neg a                           ; NEG               ; abs(distance)
 move_towards_x_1:                      ; >8acc
 ;       cb   a,@bytes+>21               ; CP $21            ; Is it longer than half way around?
-       mov  a,r0
+       movb a,r0
        movb b,a                        ; LD A,B            ; A = direction
        cb   r0,@bytes+>21
        jl   move_towards_x_2           ; JR C,$8AD3        ; Jump if not
@@ -2013,8 +2019,8 @@ handle_waves:                          ; >8bd9
 handle_waves_1:                        ; >8bfc
        movb @wave,a                    ; LD A,($7201)      ; Get wave
        cb   a,@bytes+>04               ; CP $04            ; Compare to 4
-       jl   manage_wave_lt_4           ; JR C,$8C30        ; If < 4, jump to handler
-       jeq  manage_wave_eq_4           ; JR Z,$8C07        ; If = 4, jump to handler
+       jl   handle_wave_lt_4           ; JR C,$8C30        ; If < 4, jump to handler
+       jeq  handle_wave_eq_4           ; JR Z,$8C07        ; If = 4, jump to handler
        jmp  all_waves_completed        ; JR $8C1E          ; If > 4 then all waves completed
 handle_waves_2:
        .ret
@@ -2022,7 +2028,7 @@ handle_waves_2:
 * Manage wave = 4
 *
 * Used by the routine at #R$8BD9.
-manage_wave_eq_4:                      ; >8c07
+handle_wave_eq_4:                      ; >8c07
        movb @status_flags,a            ; LD A,($71EB)      ; Test for chance stage
        czc  @bit3,a                    ; BIT 3,A           ; ...
        jne  all_waves_completed        ; JR NZ,$8C1E       ; If set then all waves completed
@@ -2032,11 +2038,11 @@ manage_wave_eq_4:                      ; >8c07
 ;      Less than 6 center enemies
        clr  af
        .rst >20                        ; RST $20           ; Random number
-manage_wave_eq_4_1:                    ; >8c16
+handle_wave_eq_4_1:                    ; >8c16
        cb   a,@bytes+>14               ; CP $14            ; If < 20,
        jl   start_wave_in_a            ; JR C,$8C3E        ; Then start that wave
        sb   @bytes+>14,a               ; SUB $14           ; Else subtract 20
-       jmp  manage_wave_eq_4_1         ; JR $8C16          ; Loop until small enough
+       jmp  handle_wave_eq_4_1         ; JR $8C16          ; Loop until small enough
 
 * All waves completed
 *
@@ -2055,7 +2061,7 @@ all_waves_completed:                   ; >8c1e
 * Manage wave < 4
 *
 * Used by the routine at #R$8BD9.
-manage_wave_lt_4:                      ; >8c30
+handle_wave_lt_4:                      ; >8c30
        movb @countdown_to_wave,a       ; LD A,($71F0)      ; Get counter
 ;       socb a,a                        ; OR A              ; Is it zero?
        jeq  !                          ; RET NZ            ; Then return
@@ -2204,9 +2210,7 @@ handle_wave_outcoming_4:               ; >8d0d
 ;       movb *hl,a                      ; LD A,(HL)         ; Increased outcoming enemies
 ;       cb   a,b                        ; CP B              ; Compare with 9 or 10
        cb   @outcoming_enemies,b
-       jeq  !                          ; RET NZ            ; Return if all are not out
-       .ret                            ;
-!
+       jne  handle_wave_outcoming_5     ; RET NZ            ; Return if all are not out
 ;       sb   *hl,*hl                    ; LD (HL),$00       ; Set outcoming enemies to 0
        movb @zero,@outcoming_enemies
        li   hl,other_flags             ; LD HL,$7256       ; Clear flag that was set
@@ -2214,6 +2218,7 @@ handle_wave_outcoming_4:               ; >8d0d
        bl   @stage_data_addr           ; CALL $84DB        ; Get stage data address in IY
        movb @>06(iy),a                 ; LD A,(IY+$06)     ; Set countdown
        movb a,@countdown_to_wave       ; LD ($71F0),A      ; ...
+handle_wave_outcoming_5:
        .ret                            ; RET               ;
 
 * Reset outcoming enemies
@@ -3766,7 +3771,7 @@ initial_game_loop:                     ; >a33b
 * Allocate 6 dot sprites for the implosion that becomes the ship
        li   iy,_a4b2                   ; LD IY,$A4B2       ; Sprite init data
        movb @bytes+>06,b               ; LD B,$06          ; Allocate 6 sprites
-_a34c:                                 ; >a34c
+display_implosion:                     ; >a34c
        .rst >28                        ; RST $28           ; Allocate sprite
        movb @bytes+>0d,*ix             ; LD (IX+$00),$0D   ; Sprite type is $0D (a dot)
        movb @zero,@>01(ix)             ; LD (IX+$01),$00   ; Polar y
@@ -3778,12 +3783,12 @@ _a34c:                                 ; >a34c
        movb @bytes+>09,@>0b(ix)        ; LD (IX+$0B),$09   ; Set color (pink)
        inc  iy                         ; INC IY            ; Next init data
        sb   one,b                      ; DJNZ $A34C        ; Loop for 6 sprites
-       jne  _a34c                      ;
+       jne  display_implosion                      ;
 * Display implosion
        movb @bytes+>14,b               ; LD B,$14          ; 20
-_a36e:                                 ; >a36e
+implosion_loop:                        ; >a36e
        .push bc                        ; PUSH BC           ; Save counter
-;       .call @sound_player
+       .call @sound_player
        .call @move_dots                ; CALL $A471        ; Move dots
        .call @control_ship             ; CALL $A73C        ; Control ship
        .call @upload_sprite_data       ; CALL $ACF9        ; Upload sprite data
@@ -3792,7 +3797,7 @@ _a36e:                                 ; >a36e
        .call @display_center_enemies   ; CALL $AB72        ; Display center enemies
        .pop bc                         ; POP BC            ; Restore counter
        sb   one,b                      ; DJNZ $A36E        ; Loop 20 times
-       jne  _a36e                      ;
+       jne  implosion_loop                      ;
 * Allocate ship etc.
        .call @init_sprite_data         ; CALL $ACDF        ;
        .rst >28                        ; RST $28           ; Allocate sprite
@@ -3813,17 +3818,17 @@ _a36e:                                 ; >a36e
        .call @call_play_sound          ; CALL $9EA3        ; ...
 * Game loop 60 times
        movb @bytes+>3c,b               ; LD B,$3C          ; 60
-_a3b6:                                 ; >a3b6
+stage_init_loop:                       ; >a3b6
        .halt                           ; HALT              ; Wait interrupt
        .push bc                        ; PUSH BC           ; Save counter
-;       .call @sound_player
+       .call @sound_player
        .call @display_stars            ; CALL $AFFF        ; Display stars
        .call @control_ship             ; CALL $A73C        ; Control ship
        .call @display_center_enemies   ; CALL $AB72        ; Display center enemies
        .call @next_frame_upl_sprites   ; CALL $84B1        ; Upload sprites
        .pop bc                         ; POP BC            ; Restore counter
        sb   one,b                      ; DJNZ $A3B6        ; Loop 60 times
-       jne  _a3b6                      ;
+       jne  stage_init_loop                      ;
        li   hl,>1a00                   ; LD HL,$1A00       ; Clear warps line
        li   de,>0020                   ; LD DE,$0020       ; ...
        sb   a,a                        ; XOR A             ; ...
@@ -3851,23 +3856,23 @@ explode:                               ; >a3e1
        movb a,@sprite_data_1           ; LD ($700E),A      ; 2nd sprite
        movb @active_shots,a            ; LD A,($7253)      ; Active shots
 ;       socb a,a                        ; OR A              ; If zero
-       jeq  _a413                      ; JR Z,$A413        ; Then skip ahead
+       jeq  explode_3                      ; JR Z,$A413        ; Then skip ahead
 * Deallocate all shots
        li   ix,sprite_data             ; LD IX,$7002       ; Sprite data table
        li   de,>000c                   ; LD DE,$000C       ; Size of each sprite
        movb @bytes+>20,b               ; LD B,$20          ; 32 sprites
        movb @bytes+>02,a               ; LD A,$02          ; Is it type $02 (shot)?
-_a402:                                 ; >a402
+explode_1:                                 ; >a402
        cb   a,*ix                      ; CP (IX+$00)       ; ...
-       jne  _a40f                      ; JR NZ,$A40F       ; No, then skip
+       jne  explode_2                      ; JR NZ,$A40F       ; No, then skip
        movb @bytes+>7f,*ix             ; LD (IX+$00),$7F   ; Set as not allocated
        movb @bytes+>f8,@>08(ix)        ; LD (IX+$08),$F8   ; Set y
-_a40f:                                 ; >a40f
+explode_2:                                 ; >a40f
        a    de,ix                      ; ADD IX,DE         ; Next sprite
        sb   one,b                      ; DJNZ $A402        ; Loop 32 times
-       jne  _a402                      ;
+       jne  explode_1                      ;
 * Set center of projection for explosion
-_a413:                                 ; >a413
+explode_3:                                 ; >a413
 ;       mov  @sprite_data+>0008,hl      ; LD HL,($700A)     ; Y and X of 1st sprite
        movb @sprite_data+8,@l
        movb @sprite_data+9,h
@@ -3880,7 +3885,7 @@ _a413:                                 ; >a413
 * Allocate 6 sprites for explosion
        li   iy,_a4b8                   ; LD IY,$A4B8       ;
        movb @bytes+>06,b               ; LD B,$06          ; Allocate 6 sprites
-_a429:                                 ; >a429
+explode_4:                                 ; >a429
        .rst >28                        ; RST $28           ; Allocate sprite
        movb @bytes+>0d,*ix             ; LD (IX+$00),$0D   ; Sprite type is $0D (a dot)
        movb @zero,@>01(ix)             ; LD (IX+$01),$00   ; Polar y
@@ -3894,17 +3899,18 @@ _a429:                                 ; >a429
        movb @bytes+>2a,@>01(ix)        ; LD (IX+$01),$2A   ; Set polar y
        inc  iy                         ; INC IY            ; Next init data
        sb   one,b                      ; DJNZ $A429        ; Loop for 6 sprites
-       jne  _a429                      ;
+       jne  explode_4                      ;
 * Game loop for 3 seconds
        movb @bytes+>14,b               ; LD B,$14          ; 20
-_a450:                                 ; >a450
+explode_loop_1:                        ; >a450
        .push bc                        ; PUSH BC           ; Outer loop
        .call @move_dots                ; CALL $A471        ; Move dots
        .call @upload_sprite_data       ; CALL $ACF9        ; Upload sprite data
        movb @bytes+>09,b               ; LD B,$09          ; 9
-_a459:                                 ; >a459
-       .halt                           ; HALT              ; Inner loop
+explode_loop_2:                        ; >a459
+;       .halt                           ; HALT              ; Inner loop
        .push bc                        ; PUSH BC           ;
+       .call @sound_player
        .call @display_stars            ; CALL $AFFF        ; Display stars
        .call @process_sprites          ; CALL $85E6        ; Process sprites
        .call @display_center_enemies   ; CALL $AB72        ; Display center enemies
@@ -3912,10 +3918,10 @@ _a459:                                 ; >a459
        .call @next_frame_upl_sprites   ; CALL $84B1        ; Upload sprites
        .pop bc                         ; POP BC            ;
        sb   one,b                      ; DJNZ $A459        ; Loop 9 times
-       jne  _a459                      ;
+       jne  explode_loop_2                      ;
        .pop bc                         ; POP BC            ;
        sb   one,b                      ; DJNZ $A450        ; Loop 20 times
-       jne  _a450                      ;
+       jne  explode_loop_1                      ;
        .ret                            ; RET               ;
 
 * Move explosion dots
@@ -4047,7 +4053,9 @@ _a6e7:                                 ; >a6e7
 add_score:                             ; >a6ec
        .push de                        ; PUSH DE           ;
        .push bc                        ; PUSH BC           ;
-       mov  hl,@points_to_add          ; LD ($72C8),HL     ; Save points to add (this buffer has one more byte)
+;       mov  hl,@points_to_add          ; LD ($72C8),HL     ; Save points to add (this buffer has one more byte)
+       movb @l,@points_to_add
+       movb h,@points_to_add+1
        movb @current_player,a          ; LD A,($71F1)      ; Current player
        li   de,score_player_1          ; LD DE,$71F3       ; Score player 1
 ;       socb a,a                        ; OR A              ; Is it player 1?
@@ -4057,19 +4065,26 @@ add_score:                             ; >a6ec
 _a6fd:                                 ; >a6fd
        .push de                        ; PUSH DE           ; Save pointer to score
        li   hl,points_to_add           ; LD HL,$72C8       ; Pointer to points to add
+
        movb @bytes+>03,b               ; LD B,$03          ; 3 bytes in score
+       clr  r1
 _a703:                                 ; >a703
        movb *de,a                      ; LD A,(DE)         ; Get score byte
-       ab   *hl,a                      ; ADC A,(HL)        ; Add points
+       andi  r1,>1000                  ; Check and add carry
+       jeq  !                          ; ...
+       ab   one,a                      ; ...
+!      ab   *hl,a                      ; ADC A,(HL)        ; Add points
        .daa                            ; DAA               ; Adjust for BCD
+       stst r1
        movb a,*de                      ; LD (DE),A         ; Store score byte
        inc  de                         ; INC DE            ; Next score byte
        inc  hl                         ; INC HL            ; Next points byte
        sb   one,b                      ; DJNZ $A703        ; Loop 3 times
        jne  _a703                      ;
        .pop de                         ; POP DE            ; Restore pointer to score
-       inc  de                         ; INC DE            ; Advance to last byte of extra life score $71F5 or $71FB
-       inc  de                         ; INC DE            ; ...
+;       inc  de                         ; INC DE            ; Advance to last byte of extra life score $71F5 or $71FB
+;       inc  de                         ; INC DE            ; ...
+       inct de
        li   hl,>0003                   ; LD HL,$0003       ; Point HL to byte at #R$71F8 or #R$71FE (initially set to
                                                            ; 6)
        a    de,hl                      ; ADD HL,DE         ; ...
@@ -4150,7 +4165,7 @@ _a76d:                                 ; >a76d
        movb a,@>02(ix)                 ; LD (IX+$02),A     ; Update polar x
        movb a,@>0e(ix)                 ; LD (IX+$0E),A     ; Also update sprite 1
        .rst >30                        ; RST $30           ; Load sprite pattern sprite 0
-       li   ix,sprite_data_1                   ; LD IX,$700E       ; Sprite 1
+       li   ix,sprite_data_1           ; LD IX,$700E       ; Sprite 1
        .rst >30                        ; RST $30           ; Load sprite pattern sprite 1
        .call @display_ship_background_patterns ; CALL $A808        ; Display ship background patterns
 * Handle fire
