@@ -1204,7 +1204,7 @@ handle_sprite_types_0e_11:             ; >8790
 !
        movb @>07(ix),r0                ; BIT 6,(IX+$07)    ; Check bit 6 of flags
        andi r0,>4000                   ;
-       jne  move_to_center           ; JR NZ,$87D5       ; If set, create map entry for enemy sprite
+       jne  move_to_center             ; JR NZ,$87D5       ; If set, create map entry for enemy sprite
        movb @>07(ix),r0                ; BIT 2,(IX+$07)    ; Check bit 2 of flags
        andi r0,>0400                   ;
        jeq  !                          ; JP NZ,$8825       ; If set, move towards viewer
