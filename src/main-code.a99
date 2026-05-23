@@ -915,8 +915,15 @@ process_next_sprite:                   ; >8600
        movb *ix,a                      ; LD A,(IX+$00)     ; Get sprite type
        movb a,@>05(ix)                 ; LD (IX+$05),A     ; Copy it to byte 5
        cb   a,@bytes+>7f               ; CP $7F            ; Is it to be deallocated?
-       jeq  deallocate_sprite          ; JP NZ,$865A       ; If not, jump ahead
-       jmp  handle_sprite_type_02      ;
+       jeq  deallocate_sprite          ; JP NZ,$865A       ; If not, jump to handlers
+       jh   process_next_sprite_1
+       clr  r1
+       movb a,@r1lb
+       sla  r1,1
+       mov  @sprite_type_handler_table(r1),r1
+       b    *r1
+process_next_sprite_1:
+       .ret
                                        ; Continue into deallocate_sprite
 * This entry point is used by the routines at #R$8654, #R$8673, #R$867D and
 * #R$8815.
@@ -958,18 +965,50 @@ deallocate_enemy:                      ; >8654
        sb   one,*hl                    ; DEC (HL)          ; ...
        jmp  deallocate_sprite          ; JR $862F          ; Deallocate sprite
 
+sprite_type_handler_table:
+       data process_next_sprite_1      ; 00
+       data process_next_sprite_1      ; 01
+       data sprite_handler_02          ; 02
+       data sprite_handler_03          ; 03
+       data sprite_handler_04_0c       ; 04
+       data sprite_handler_04_0c       ; 05
+       data sprite_handler_04_0c       ; 06
+       data sprite_handler_04_0c       ; 07
+       data sprite_handler_04_0c       ; 08
+       data sprite_handler_04_0c       ; 09
+       data sprite_handler_04_0c       ; 0a
+       data sprite_handler_04_0c       ; 0b
+       data sprite_handler_04_0c       ; 0c
+       data process_next_sprite_1      ; 0d
+       data sprite_handler_0e_11       ; 0e
+       data sprite_handler_0e_11       ; 0f
+       data sprite_handler_0e_11       ; 10
+       data sprite_handler_0e_11       ; 11
+       data sprite_handler_12_13       ; 12
+       data sprite_handler_12_13       ; 13
+       data sprite_handler_14          ; 14
+       data sprite_handler_15_17       ; 15
+       data sprite_handler_15_17       ; 16
+       data sprite_handler_15_17       ; 17
+       data sprite_handler_18_19       ; 18
+       data sprite_handler_18_19       ; 19
+       data sprite_handler_1a_1c       ; 1A
+       data sprite_handler_1a_1c       ; 1B
+       data sprite_handler_1a_1c       ; 1C
+
 * Handle sprite type $02
 *
 * Used by the routine at #R$85E6.
 *
 * I:A Sprite type
 * I:IX Sprite data
-handle_sprite_type_02:                 ; >865a
-       cb   a,@bytes+>02               ; CP $02            ; Is sprite type $02?
-       jeq  !                          ; JP NZ,$867D       ; If not proceed to next handler
-       b    @handle_sprite_types_04_0c ;
-!
+;handle_sprite_type_02:                 ; >865a
+;       cb   a,@bytes+>02               ; CP $02            ; Is sprite type $02?
+;       jeq  !                          ; JP NZ,$867D       ; If not proceed to next handler
+;       b    @handle_sprite_types_04_0c ;
+;!
 * Sprite type $02 (shot)
+sprite_handler_02:
        ab   one,@>05(ix)               ; INC (IX+$05)      ; Mark for pattern reload
        movb @>01(ix),a                 ; LD A,(IX+$01)     ; Get polar y
        ab   one,a                      ; INC A             ; Move shot
@@ -994,12 +1033,13 @@ _8673:                                 ; >8673
 *
 * I:A Sprite type
 * I:IX Sprite data
-handle_sprite_types_04_0c:             ; >867d
-       cb   a,@bytes+>04               ; CP $04            ; Is sprite type < $04
-       jl   handle_sprite_type_14      ; JR C,$86DE        ; Then jump
-       cb   a,@bytes+>0d               ; CP $0D            ; Is it >= $0D
-       jhe  handle_sprite_type_14      ; JR NC,$86DE       ; Then jump
+;handle_sprite_types_04_0c:             ; >867d
+;       cb   a,@bytes+>04               ; CP $04            ; Is sprite type < $04
+;       jl   handle_sprite_type_14      ; JR C,$86DE        ; Then jump
+;       cb   a,@bytes+>0d               ; CP $0D            ; Is it >= $0D
+;       jhe  handle_sprite_type_14      ; JR NC,$86DE       ; Then jump
 * Sprite types $04 - $0C (enemy remains, numbers)
+sprite_handler_04_0c:
        sb   one,@>03(ix)               ; DEC (IX+$03)      ; Decrement counter
        jeq  !                          ; RET NZ            ; Return if not zero
        .ret                            ;
@@ -1045,10 +1085,11 @@ handle_sprite_types_04_0c:             ; >867d
 *
 * I:A Sprite type
 * I:IX Sprite data
-handle_sprite_type_14:                 ; >86de
-       cb   a,@bytes+>14               ; CP $14            ; Is sprite type $014
-       jne  handle_sprite_types_12_13  ; JR NZ,$86E9       ; If not, jump ahead
+;handle_sprite_type_14:                 ; >86de
+;       cb   a,@bytes+>14               ; CP $14            ; Is sprite type $014
+;       jne  handle_sprite_types_12_13  ; JR NZ,$86E9       ; If not, jump ahead
 * Sprite type $14 (meteor)
+sprite_handler_14:
        ab   one,@>05(ix)               ; INC (IX+$05)      ; Mark for pattern reload
        sb   one,@>01(ix)               ; DEC (IX+$01)      ; Decrement polar y
        .ret                            ; RET               ; Return to #R$8A41
@@ -1059,12 +1100,13 @@ handle_sprite_type_14:                 ; >86de
 *
 * I:A Sprite type
 * I:IX Sprite data
-handle_sprite_types_12_13:             ; >86e9
-       cb   a,@bytes+>12               ; CP $12            ; Is sprite type < $012
-       jl   handle_sprite_type_03      ; JR C,$870C        ; If so, jump ahead
-       cb   a,@bytes+>14               ; CP $14            ; Is sprite type >= $014
-       jhe  handle_sprite_type_03      ; JR NC,$870C       ; If so, jump ahead
+;handle_sprite_types_12_13:             ; >86e9
+;       cb   a,@bytes+>12               ; CP $12            ; Is sprite type < $012
+;       jl   handle_sprite_type_03      ; JR C,$870C        ; If so, jump ahead
+;       cb   a,@bytes+>14               ; CP $14            ; Is sprite type >= $014
+;       jhe  handle_sprite_type_03      ; JR NC,$870C       ; If so, jump ahead
 * Sprite types $12 - $13 (enemy missile)
+sprite_handler_12_13:
        movb @frame_counter,a           ; LD A,($71F2)      ; Frame counter
        movb a,b                        ; LD B,A            ; Store in B
        andi a,>0100                    ; AND $01           ; Every 2nd frame
@@ -1088,10 +1130,11 @@ _8705:                                 ; >8705
 *
 * I:A Sprite type
 * I:IX Sprite data
-handle_sprite_type_03:                 ; >870c
-       cb   a,@bytes+>03               ; CP $03            ; Is sprite type $03?
-       jne  handle_sprite_types_15_17  ; JR NZ,$873E       ; If not, jump ahead
+;handle_sprite_type_03:                 ; >870c
+;       cb   a,@bytes+>03               ; CP $03            ; Is sprite type $03?
+;       jne  handle_sprite_types_15_17  ; JR NZ,$873E       ; If not, jump ahead
 * Sprite type $03 (double shot pickup)
+sprite_handler_03:
        movb @status_flags,a            ; LD A,($71EB)      ; Check if you have died
        movb a,r0                       ; BIT 2,A           ; ...
        andi r0,>0400                   ;
@@ -1124,12 +1167,13 @@ handle_sprite_type_03:                 ; >870c
 *
 * I:A Sprite type
 * I:IX Sprite data
-handle_sprite_types_15_17:             ; >873e
-       cb   a,@bytes+>15               ; CP $15            ; Is sprite type < $15
-       jl   handle_sprite_types_0e_11  ; JR C,$8790        ; If so, jump ahead
-       cb   a,@bytes+>18               ; CP $18            ; Is sprite type >= $18
-       jhe  handle_sprite_types_0e_11  ; JR NC,$8790       ; If so, jump ahead
+;handle_sprite_types_15_17:             ; >873e
+;       cb   a,@bytes+>15               ; CP $15            ; Is sprite type < $15
+;       jl   handle_sprite_types_0e_11  ; JR C,$8790        ; If so, jump ahead
+;       cb   a,@bytes+>18               ; CP $18            ; Is sprite type >= $18
+;       jhe  handle_sprite_types_0e_11  ; JR NC,$8790       ; If so, jump ahead
 * sprite types $15 - $17 (laser fence)
+sprite_handler_15_17:
        movb @bytes+>f8,b               ; LD B,$07          ; Mask = 7
        movb @status_flags,a            ; LD A,($71EB)      ; Check if you have died
        movb a,r0                       ; BIT 2,A           ; ...
@@ -1182,16 +1226,17 @@ _8787:                                 ; >8787
 *
 * I:A Sprite type
 * I:IX Sprite data
-handle_sprite_types_0e_11:             ; >8790
-       cb   a,@bytes+>0e               ; CP $0E            ; Is sprite type < $0E
-       jhe  !                          ; JP C,$899E        ; If so, jump ahead
-       b    @handle_sprite_types_18_1c ;
-!
-       cb   a,@bytes+>12               ; CP $12            ; Is sprite type >= $12
-       jl   !                          ; JP NC,$899E       ; If so, jump ahead
-       b    @handle_sprite_types_18_1c ;
-!
+;handle_sprite_types_0e_11:             ; >8790
+;       cb   a,@bytes+>0e               ; CP $0E            ; Is sprite type < $0E
+;       jhe  !                          ; JP C,$899E        ; If so, jump ahead
+;       b    @handle_sprite_types_18_1c ;
+;!
+;       cb   a,@bytes+>12               ; CP $12            ; Is sprite type >= $12
+;       jl   !                          ; JP NC,$899E       ; If so, jump ahead
+;       b    @handle_sprite_types_18_1c ;
+;!
 * Sprite type $0E - $11 (enemies)
+sprite_handler_0e_11:
        movb @>07(ix),r0                ; BIT 7,(IX+$07)    ; Check bit 7 to see if a path address is set
        andi r0,>8000                   ;
        jeq  !                          ; JP NZ,$88FE       ; If set, update sprite path
@@ -1588,18 +1633,19 @@ set_sprite_flags_to_40:                ; >8999
 * Handle sprite types $18 - $1C
 *
 * Used by the routine at #R$8790.
-handle_sprite_types_18_1c:             ; >899e
-       cb   a,@bytes+>18               ; CP $18            ; Is sprite type < $18
-       jhe  !                          ; RET C             ; Then return
-       .ret                            ;
-!
-       cb   a,@bytes+>1a               ; CP $1A            ; Is sprite type < $1A
-       jl   _89b8                      ; JR C,$89B8        ; If so, jump ahead
+;handle_sprite_types_18_1c:             ; >899e
+;       cb   a,@bytes+>18               ; CP $18            ; Is sprite type < $18
+;       jhe  !                          ; RET C             ; Then return
+;       .ret                            ;
+;!
+;       cb   a,@bytes+>1a               ; CP $1A            ; Is sprite type < $1A
+;       jl   sprite_handler_18_19       ; JR C,$89B8        ; If so, jump ahead
 * Sprite types $1A - $1C (circular enemies)
+sprite_handler_1a_1c:
        movb a,b                        ; LD B,A            ; B = sprite type
        movb @frame_counter,a           ; LD A,($71F2)      ; Frame counter
        andi a,>0300                    ; AND $03           ; Mod 4
-       jne  _89b8                      ; JR NZ,$89B8       ; If not zero the skip ahead
+       jne  sprite_handler_18_19       ; JR NZ,$89B8       ; If not zero the skip ahead
        movb b,a                        ; LD A,B            ; A = sprite type
        ab   one,a                      ; INC A             ; A = sprite type + 1
        cb   a,@bytes+>1d               ; CP $1D            ; Is sprite type + 1 < $1D, i.e. sprite type < $1C, i.e.
@@ -1609,7 +1655,7 @@ handle_sprite_types_18_1c:             ; >899e
 _89b5:                                 ; >89b5
        movb a,*ix                      ; LD (IX+$00),A     ; This means rotate between $1A, $1B, and $1C
 * Sprite types $18 - $19 (three spheres, star shape) plus $1A - 1C
-_89b8:                                 ; >89b8
+sprite_handler_18_19:                  ; >89b8
        movb @>07(ix),r0                ; BIT 7,(IX+$07)    ; Text flag bit 7
        andi r0,>8000                   ;
        jeq  _8a2d                      ; JR Z,$8A2D        ; If reset, move towards viewer
