@@ -36,11 +36,11 @@ new_game:                              ; >8064
        li   hl,>1800                   ; LD HL,$1800       ; Name table address
        li   de,>0300                   ; LD DE,$0300       ; Name table size
        sb   a,a                        ; XOR A             ; Zero
-       .call @fill_vram                ; CALL $1F82        ; FILL_VRAM (clear screen)
+       bl   @fill_vram                  ; CALL $1F82        ; FILL_VRAM (clear screen)
        li   hl,>201c                   ; LD HL,$201C       ; Last 4 bytes of color table
        li   de,>0004                   ; LD DE,$0004       ; 4 bytes
        movb @bytes+>f1,a               ; LD A,$F1          ; Set to white/black
-       .call @fill_vram                ; CALL $1F82        ; FILL_VRAM
+       bl   @fill_vram                 ; CALL $1F82        ; FILL_VRAM
        li   hl,current_player          ; LD HL,$71F1       ; Clear RAM  from $71F1
        li   de,frame_counter           ; LD DE,$71F2       ; To $7256
        sb   a,a                        ; XOR A             ; ...
@@ -224,7 +224,7 @@ _81b9:                                 ; >81b9
        li   hl,buffer                  ; LD HL,$71A3       ; Restore player data from VDP RAM into buffer
        li   de,>1300                   ; LD DE,$1300       ; ...
        li   bc,>002d                   ; LD BC,$002D       ; ...
-       .call @read_vram                ; CALL $1FE2        ; READ_VRAM
+       bl   @read_vram                 ; CALL $1FE2        ; READ_VRAM
        li   hl,lives                   ; LD HL,$71FF       ; Save player data to VDP RAM
        li   de,>1300                   ; LD DE,$1300       ; ...
        li   bc,>002d                   ; LD BC,$002D       ; ...
@@ -574,11 +574,11 @@ next_stage_2:                          ; >83ff
        li   hl,>201c                   ; LD HL,$201C       ; Set 4 colors to white/black
        li   de,>0004                   ; LD DE,$0004       ; ...
        movb @bytes+>f1,a               ; LD A,$F1          ; ...
-       .call @fill_vram                ; CALL $1F82        ; FILL_VRAM
+       bl   @fill_vram                  ; CALL $1F82        ; FILL_VRAM
        li   hl,>0700                   ; LD HL,$0700       ; Address in pattern table
        li   de,>0100                   ; LD DE,$0100       ; 256 bytes = 32 patterns
        sb   a,a                        ; XOR A             ; Clear
-       .call @fill_vram                ; CALL $1F82        ; FILL_VRAM
+       bl   @fill_vram                  ; CALL $1F82        ; FILL_VRAM
        movb @other_flags,a             ; LD A,($7256)      ; Save flags
        .push af                        ; PUSH AF           ; ...
        .call @init_stage               ; CALL $8212        ; Init stage
@@ -712,7 +712,8 @@ upload_patterns:                       ; >84cb
        .pop iy                         ; POP IY            ; IY = count
        inc  hl                         ; INC HL            ; HL now points to graphics data
        movb @bytes+>03,a               ; LD A,$03          ; Table code (3 = pattern generator table)
-       b    @put_vram                  ; JP $1FBE          ; PUT_VRAM
+       bl   @put_vram                  ; JP $1FBE          ; PUT_VRAM
+       .ret
 
 * Get stage data address
 *
@@ -744,11 +745,12 @@ clear_rows_9_and_14:                   ; >84ed
        li   hl,>1920                   ; LD HL,$1920       ; Name table row 9
        li   de,>0020                   ; LD DE,$0020       ; 32 bytes
        sb   a,a                        ; XOR A             ; Clear
-       .call @fill_vram                ; CALL $1F82        ; FILL_VRAM
+       bl   @fill_vram                  ; CALL $1F82        ; FILL_VRAM
        li   hl,>19c0                   ; LD HL,$19C0       ; Name table row 14
        li   de,>0020                   ; LD DE,$0020       ; 32 bytes
        sb   a,a                        ; XOR A             ; Clear
-       b    @fill_vram                 ; JP $1F82          ; FILL_VRAM
+       bl   @fill_vram                 ; JP $1F82          ; FILL_VRAM
+       .ret
 
 ;* Interrupt routine
 ;*
@@ -2639,7 +2641,7 @@ create_mine:                           ; >8f0f
        li   de,>0002                   ; LD DE,$0002       ; Update 2 color sets
        .pop bc                         ; POP BC            ; Restore color
        movb @c,a                       ; LD A,C            ; A = color
-       .call @fill_vram                ; CALL $1F82        ; FILL_VRAM
+       bl   @fill_vram                  ; CALL $1F82        ; FILL_VRAM
        movb @mine_name,a               ; LD A,($7268)      ; Get name
        movb a,@>06(iy)                 ; LD (IY+$06),A     ; Save in structure
        ab   @bytes+>10,a               ; ADD A,$10         ; Add 16 (when will this be used?)
@@ -2791,25 +2793,25 @@ mines_movement_table:                  ; >9046
 *
 * Used by the routine at #R$8024.
 start_screen:                          ; >90d6
-       .call @mode_1                   ; CALL $1F85        ; MODE_1 (pattern generator table at  $0000, name table at
+       bl   @mode_1                   ; CALL $1F85         ; MODE_1 (pattern generator table at  $0000, name table at
                                                            ; $1800, color table at $2000)
        li   hl,>0800                   ; LD HL,$0800       ; Set sprite generator table at $0800 (was $3800)
        movb one,a                      ; LD A,$01          ;
-       .call @init_table               ; CALL $1FB8        ; INIT_TABLE
+       bl   @init_table               ; CALL $1FB8        ; INIT_TABLE
        li   hl,>1c00                   ; LD HL,$1C00       ; Set sprite attribute table at $1C00 (was $1B00)
        sb   a,a                        ; LD A,$00          ;
-       .call @init_table               ; CALL $1FB8        ; INIT_TABLE
+       bl   @init_table               ; CALL $1FB8        ; INIT_TABLE
        sb   a,a                        ; LD A,$00          ; Clear all VDP RAM
        li   hl,>0000                   ; LD HL,$0000       ;
        li   de,>4000                   ; LD DE,$4000       ;
-       .call @fill_vram                ; CALL $1F82        ; FILL_VRAM
-       .call @load_ascii               ; CALL $1F7F        ; LOAD_ASCII
+       bl   @fill_vram                  ; CALL $1F82       ; FILL_VRAM
+       bl   @load_ascii               ; CALL $1F7F         ; LOAD_ASCII
        li   hl,stars                   ; LD HL,$B134       ; Stars
        .call @upload_patterns          ; CALL $84CB        ; Upload 18 star patterns starting with 1
        li   hl,buffer                  ; LD HL,$71A3       ; Save pattern 33 from VDP to RAM
        li   de,>0108                   ; LD DE,$0108       ;
        li   bc,>0008                   ; LD BC,$0008       ;
-       .call @read_vram                ; CALL $1FE2        ; READ_VRAM
+       bl   @read_vram                 ; CALL $1FE2        ; READ_VRAM
        li   hl,buffer                  ; LD HL,$71A3       ; Write it back to VDP patern 63
        li   de,>01f8                   ; LD DE,$01F8       ;
        li   bc,>0008                   ; LD BC,$0008       ;
@@ -2999,7 +3001,7 @@ clear_row_7:                           ; >920d
        sb   a,a                        ; LD A,$00          ; Space
        li   hl,>18e0                   ; LD HL,$18E0       ; Address in name table (row 7)
        li   de,>0020                   ; LD DE,$0020       ; 32 bytes
-       .call @fill_vram                ; CALL $1F82        ; FILL_VRAM
+       bl   @fill_vram                  ; CALL $1F82        ; FILL_VRAM
        .pop bc                         ; POP BC            ;
        .pop de                         ; POP DE            ;
        .pop hl                         ; POP HL            ;
@@ -3107,7 +3109,7 @@ _928a:                                 ; >928a
        .push hl                        ; PUSH HL           ;
        li   bc,>0048                   ; LD BC,$0048       ; Read 9 patterns from $1400 (?)
        li   hl,buffer                  ; LD HL,$71A3       ; Into buffer
-       .call @read_vram                ; CALL $1FE2        ; READ_VRAM
+       bl   @read_vram                 ; CALL $1FE2        ; READ_VRAM
        .pop de                         ; POP DE            ; DE = $0400
        .push de                        ; PUSH DE           ;
        li   bc,>0048                   ; LD BC,$0048       ; Write 9 patterns from buffer
@@ -3918,17 +3920,17 @@ stage_init_loop:                       ; >a3b6
        li   hl,>1a00                   ; LD HL,$1A00       ; Clear warps line
        li   de,>0020                   ; LD DE,$0020       ; ...
        sb   a,a                        ; XOR A             ; ...
-       .call @fill_vram                ; CALL $1F82        ; FILL_VRAM
+       bl   @fill_vram                  ; CALL $1F82        ; FILL_VRAM
        movb @status_flags,a            ; LD A,($71EB)      ; Status
        movb a,r0                       ; BIT 7,A           ; Check bit for 2 players
        andi r0,>8000                   ;
-       jne  !                          ; RET Z             ; Return if not
-       .ret                            ;
-!
+       jeq  initial_game_loop_1        ; RET Z             ; Return if not
        li   hl,>192c                   ; LD HL,$192C       ; Clear player message
        li   de,>0008                   ; LD DE,$0008       ; ...
        sb   a,a                        ; XOR A             ; ...
-       b    @fill_vram                 ; JP $1F82          ; FILL_VRAM and return
+       bl   @fill_vram                 ; JP $1F82          ; FILL_VRAM and return
+initial_game_loop_1:
+       .ret
 
 * Explode
 *
@@ -4115,7 +4117,7 @@ display_lives:                         ; >a6d2
        li   hl,>1ae2                   ; LD HL,$1AE2       ; VDP address of 'lives'
        li   de,>0009                   ; LD DE,$0009       ; Count
        sb   a,a                        ; XOR A             ; Value
-       .call @fill_vram                ; CALL $1F82        ; FILL_VRAM
+       bl   @fill_vram                  ; CALL $1F82        ; FILL_VRAM
        movb @lives,a                   ; LD A,($71FF)      ; Get lives
        sb   one,a                      ; DEC A             ; Display one less live
        jne  !                          ; RET Z             ; Return if none to display
@@ -4686,7 +4688,7 @@ _aba0:                                 ; >aba0
        mov  hl,@center_enemies_pattern ; LD ($72D0),HL     ; Save VDP address
        li   de,>0080                   ; LD DE,$0080       ; Clear 16 patterns
        sb   a,a                        ; XOR A             ; ...
-       .call @fill_vram                ; CALL $1F82        ; FILL_VRAM
+       bl   @unrolled_fill_vram        ; CALL $1F82        ; FILL_VRAM
        movb @center_enemy_processed,a  ; LD A,($72CD)      ; Get enemy to process
 _abc4:                                 ; >abc4
        movb a,@c                       ; LD C,A            ; BC = enemy to process
@@ -5199,7 +5201,7 @@ load_sprite_pattern_fast_7:
 ;       .ex_de_hl                       ; EX DE,HL          ; Move HL into DE, which becomes source address
 ;       li   hl,buffer                  ; LD HL,$71A3       ; Buffer
 ;       li   bc,>0008                   ; LD BC,$0008       ; Read 8 bytes
-;       .call @read_vram                ; CALL $1FE2        ; READ_VRAM
+;       bl   @read_vram                  ; CALL $1FE2        ; READ_VRAM
 ;       clr  af
 ;       movb @>0a(ix),a                 ; LD A,(IX+$0A)     ; Get pattern
 ;;       ab   a,a                        ; ADD A,A           ; Multiply by 8

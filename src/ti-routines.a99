@@ -295,6 +295,36 @@ vmbw_1:
 
 *********************************************************************
 *
+* VDP multiple Byte Write (unrolled)
+*
+* R0: Write address in VDP RAM
+* R1: Starting read address in CPU RAM
+* R2: Number of bytes to send
+*
+vmbw_unrolled:
+       swpb r0
+       movb r0,@vdpwa                  ; Send low byte of VDP RAM write address
+       swpb r0
+       ori  r0,>4000                   ; Set read/write bits 14 and 15 to write (01)
+       movb r0,@vdpwa                  ; Send high byte of VDP RAM write address
+       li   r0,vdpwd
+       srl  r2,3
+vmbw_unrolled_1:
+       movb *r1+,*r0                   ; Write byte to VDP RAM
+       movb *r1+,*r0                   ; Write byte to VDP RAM
+       movb *r1+,*r0                   ; Write byte to VDP RAM
+       movb *r1+,*r0                   ; Write byte to VDP RAM
+       movb *r1+,*r0                   ; Write byte to VDP RAM
+       movb *r1+,*r0                   ; Write byte to VDP RAM
+       movb *r1+,*r0                   ; Write byte to VDP RAM
+       movb *r1+,*r0                   ; Write byte to VDP RAM
+       dec  r2
+       jne  vmbw_unrolled_1
+       rt
+*// vmbw_unrolled
+
+*********************************************************************
+*
 * VDP Single Byte Multiple Write
 *
 * R0: Write address in VDP RAM
@@ -314,6 +344,36 @@ vsmw_1:
        jne  vsmw_1
        rt
 *// vsmw
+
+*********************************************************************
+*
+* VDP Single Byte Multiple Write (unrolled)
+*
+* R0: Write address in VDP RAM
+* R1: MSB of R1 sent to VDP RAM
+* R2: Number of bytes to write to VDP RAM
+*
+vsmw_unrolled:
+       swpb r0
+       movb  r0,@vdpwa                 ; Send low byte of VDP RAM write address
+       swpb r0
+       ori  r0,>4000                   ; Set read/write bits 14 and 15 to write (01)
+       movb r0,@vdpwa                  ; Send high byte of VDP RAM write address
+       li   r0,vdpwd
+       srl  r2,3
+vsmw_unrolled_1:
+       movb r1,*r0                     ; Write byte to VDP RAM
+       movb r1,*r0                     ; Write byte to VDP RAM
+       movb r1,*r0                     ; Write byte to VDP RAM
+       movb r1,*r0                     ; Write byte to VDP RAM
+       movb r1,*r0                     ; Write byte to VDP RAM
+       movb r1,*r0                     ; Write byte to VDP RAM
+       movb r1,*r0                     ; Write byte to VDP RAM
+       movb r1,*r0                     ; Write byte to VDP RAM
+       dec  r2                         ; Byte counter
+       jne  vsmw_unrolled_1
+       rt
+*// vsmw_unrolled
 
 *********************************************************************
 *
@@ -557,14 +617,12 @@ ti_rnd:
 * Wait for vertical retrace (CRU)
 *
 ti_vsync:
-       .proc
        movb @vdpsta,@vdp_status
 ti_vsync_1:
        clr  r12
        tb   2                          ; Test CRU bit for VDP interrupt
        jeq  ti_vsync_1
-;       bl   @module_player
-       .endproc
+       rt
 *// ti_vsync
 
 *********************************************************************

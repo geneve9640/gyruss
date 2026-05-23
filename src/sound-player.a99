@@ -2,7 +2,7 @@
 *
 * Used by the routine at #R$8024.
 init_sound:                            ; >9ade
-       .call @turn_off_sound           ; CALL $1FD6        ; TURN_OFF_SOUND
+       bl   @turn_off_sound            ; CALL $1FD6        ; TURN_OFF_SOUND
        li   hl,tune_data_buffer_1      ; LD HL,$727D       ; First tune data buffer
        li   de,>000a                   ; LD DE,$000A       ; Size of tune data
        mov  hl,@ptr_psg_noise_data     ; LD ($7270),HL     ; Set to #R$727D

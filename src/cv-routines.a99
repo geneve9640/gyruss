@@ -3,9 +3,10 @@ turn_off_sound:
        movb @bytes+>bf,@sound
        movb @bytes+>df,@sound
        movb @bytes+>ff,@sound
-       .ret
+       rt
 
 mode_1:
+       .proc
        li   r0,>0000
        bl   @vwtr
        li   r0,>01e0
@@ -32,9 +33,10 @@ mode_1:
        li   a,>0400
        li   hl,>2000
        .call @init_table
-       .ret
+       .endproc
 
 init_table:
+       .proc
        movb a,r1
        srl  r1,8
        sla  r1,1
@@ -80,11 +82,11 @@ init_table_4:
 init_table_5:
        bl   @vwtr
 init_table_6:
-       .ret
+       .endproc
 
 read_register:
        movb @vdp_status,a
-       .ret
+       rt
 
 write_register:
        swpb bc
@@ -95,11 +97,12 @@ write_register:
        rt
 
 read_vram:
+       .proc
        mov  de,r0
        mov  hl,r1
        mov  bc,r2
        bl   @vmbr
-       .ret
+       .endproc
 
 write_vram:
        swpb de
@@ -115,34 +118,31 @@ write_vram_1:
        rt
 
 unrolled_write_vram:
-       swpb de
-       movb de,@vdpwa                  ; Send low byte of VDP RAM write address
-       swpb de
-       ori  de,>4000                   ; Set read/write bits 14 and 15 to write (01)
-       movb de,@vdpwa                  ; Send high byte of VDP RAM write address
-       li   de,vdpwd
-       srl  bc,3
-unrolled_write_vram_1:
-       movb *hl+,*de                   ; Write byte to VDP RAM
-       movb *hl+,*de                   ; Write byte to VDP RAM
-       movb *hl+,*de                   ; Write byte to VDP RAM
-       movb *hl+,*de                   ; Write byte to VDP RAM
-       movb *hl+,*de                   ; Write byte to VDP RAM
-       movb *hl+,*de                   ; Write byte to VDP RAM
-       movb *hl+,*de                   ; Write byte to VDP RAM
-       movb *hl+,*de                   ; Write byte to VDP RAM
-       dec  bc
-       jne  unrolled_write_vram_1
-       rt
+       .proc
+       mov  de,r0
+       mov  hl,r1
+       mov  bc,r2
+       bl   @vmbw_unrolled
+       .endproc
 
 fill_vram:
+       .proc
        mov  hl,r0
        mov  a,r1
        mov  de,r2
        bl   @vsmw
-       .ret
+       .endproc
+
+unrolled_fill_vram:
+       .proc
+       mov  hl,r0
+       mov  a,r1
+       mov  de,r2
+       bl   @vsmw_unrolled
+       .endproc
 
 put_vram:
+       .proc
        mov de,r0
        sla  r0,3
        movb a,r1
@@ -153,15 +153,16 @@ put_vram:
        mov  iy,r2
        sla  r2,3
        bl   @vmbw
-       .ret
+       .endproc
 
 load_ascii:
-       mov  @pattern_generator_vdp_address,r0
-       ai   r0,29*8
-       li   r1,ascii_patterns
-       li   r2,(128-29)*8
-       bl   @vmbw
-       .ret
+       .proc
+       mov  @pattern_generator_vdp_address,de
+       ai   de,29*8
+       li   hl,ascii_patterns
+       li   bc,(128-29)*8
+       bl   @unrolled_write_vram
+       .endproc
 
 decoder:
        .proc
