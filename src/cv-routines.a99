@@ -171,8 +171,9 @@ load_ascii:
 
 decoder:
        .proc
+       li   r0,JOY_FI
+       a    hl,r0
        clr  hl
-       li   r0,>0606
        bl   @ti_check_key
        jeq  !
        socb @bytes+>40,h

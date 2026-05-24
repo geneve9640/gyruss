@@ -70,8 +70,7 @@ new_game:                              ; >8064
        sb   a,a                        ; XOR A             ; Parameter to display score
        .call @display_score            ; CALL $A699        ; Display score player 1
        movb @status_flags,a            ; LD A,($71EB)      ; Flags
-       movb a,r0                       ; BIT 7,A           ; Test bit for two players
-       andi r0,>8000                   ;
+       czc  @bit7,a                    ; BIT 7,A           ; Test bit for two players
        jeq  new_game_1                 ; JR Z,$80E0        ; If bit is reset then skip ahead
        li   de,>181e                   ; LD DE,$181E       ; Display '-' at the top right corner
        movb @bytes+>2d,a               ; LD A,$2D          ; ...
@@ -121,21 +120,16 @@ main_loop:                             ; >80e8
        movb @current_player,a          ; LD A,($71F1)      ; Current player
        .call @display_score            ; CALL $A699        ; Display score
        movb @status_flags,a            ; LD A,($71EB)      ; Status flags
-       movb a,r0                       ; BIT 2,A           ; Test bit 2
-       andi r0,>0400                   ;
-       jeq  !                          ; JP NZ,$8139       ; Exit main loop if set
-       b    @died                      ;
-!
-       movb a,r0                       ; BIT 1,A           ; Test bit 1
-       andi r0,>0200                   ;
+       czc  @bit2,a                    ; BIT 2,A           ; Test bit 2
+       jne  died                       ; JP NZ,$8139       ; Exit main loop if set
+       czc  @bit1,a                    ; BIT 1,A           ; Test bit for all waves completed
        jeq  main_loop                  ; JR Z,$80E8        ; Loop if not set
        movb @total_enemies,a           ; LD A,($7206)      ; Get total enemies
        li   hl,active_enemy_shots      ; LD HL,$7252       ; Add enemy shots
        ab   *hl,a                      ; ADD A,(HL)        ; ...
-       jne  !                          ; JP Z,$832A        ; Stage completed when sum is zero
+       jne  main_loop                  ; JP Z,$832A        ; Stage completed when sum is zero
        b    @stage_completed           ;
-!
-       jmp  main_loop                  ; JR $80E8          ; Loop
+;       jmp  main_loop                  ; JR $80E8          ; Loop
 
 * Died
 *
@@ -206,15 +200,14 @@ game_over_loop:                        ; >8192
        b    @wait_for_restart          ;
 !
        socb @bits+5,*hl                ; SET 5,(HL)        ; Else flag that one player game over
-       jmp  switch_player_1                      ; JR $81B9          ; And switch player
+       jmp  switch_player_1            ; JR $81B9          ; And switch player
 
 * Switch player
 *
 * Used by the routine at #R$8170.
 switch_player:                         ; >81ae
        movb @status_flags,a            ; LD A,($71EB)      ; Test for two players
-       movb a,r0                       ; BIT 7,A           ; ...
-       andi r0,>8000                   ;
+       czc  @bit7,a                    ; BIT 7,A           ; ...
        jeq  switch_player_2            ; JR Z,$81E2        ; Skip ahead if one player
        movb *hl,r0                     ; BIT 5,(HL)        ; Is one player already game over?
        andi r0,>2000                   ;
@@ -223,15 +216,15 @@ switch_player:                         ; >81ae
 switch_player_1:                       ; >81b9
        li   hl,buffer                  ; LD HL,$71A3       ; Restore player data from VDP RAM into buffer
        li   de,>1300                   ; LD DE,$1300       ; ...
-       li   bc,>002d                   ; LD BC,$002D       ; ...
+       li   bc,active_enemies-lives    ; LD BC,$002D       ; ...
        bl   @read_vram                 ; CALL $1FE2        ; READ_VRAM
        li   hl,lives                   ; LD HL,$71FF       ; Save player data to VDP RAM
        li   de,>1300                   ; LD DE,$1300       ; ...
-       li   bc,>002d                   ; LD BC,$002D       ; ...
+       li   bc,active_enemies-lives    ; LD BC,$002D       ; ...
        bl    @write_vram               ; RST $38           ; WRITE_VRAM
        li   hl,buffer                  ; LD HL,$71A3       ; Copy data from buffer to right place
        li   de,lives                   ; LD DE,$71FF       ; ...
-       li   bc,>002d                   ; LD BC,$002D       ; ...
+       li   bc,active_enemies-lives    ; LD BC,$002D       ; ...
        .ldir                           ; LDIR              ; ...
        movb @current_player,a          ; LD A,($71F1)      ; Current player
        xor  one,a                      ; XOR $01           ; Switch player
@@ -279,7 +272,7 @@ init_stage:                            ; >8212
        .ldir                           ; LDIR              ; ...
        movb one,a                      ; LD A,$01          ; Set sprite countdown to 1
        movb a,@sprite_countdown        ; LD ($71EE),A      ; ...
-       li   hl,status_flags            ; LD HL,$71EB       ; Clear died flag
+       li   hl,status_flags            ; LD HL,$71EB       ; Reset died flag
        szcb @bits+2,*hl                ; RES 2,(HL)        ; ...
 * Calculate stage data index
        movb @completed_stages,a        ; LD A,($7205)      ; Get completed stages
@@ -394,7 +387,7 @@ init_stage_10:                         ; >82c3
        inc  hl                         ; INC HL            ; Increment source to text
        bl    @write_vram               ; RST $38           ; WRITE_VRAM Display the X WARPS TO Y message
 * Display ship and stars with music for a short while
-       .call @display_player           ; CALL $830E        ; Display player if 2 player
+       .call @display_player           ; CALL $830E        ; Display player if two player
        sb   b,b                        ; LD B,$00          ; For calculating ...
        movb @stage,a                   ; LD A,($7200)      ; Get stage
        li   hl,completed_stages        ; LD HL,$7205       ; Add completed stages
@@ -419,7 +412,7 @@ init_stage_11:                         ; >82f6
        .call @initial_game_loop        ; CALL $A33B        ; Initial game loop
        .call @init_mine_variables_2    ; CALL $8E8D        ; Init some variables
        li   hl,status_flags            ; LD HL,$71EB       ; Update status flags
-       szcb @bits+4,*hl                ; RES 4,(HL)        ; ...
+       szcb @bits+4,*hl                ; RES 4,(HL)        ; Reset init flag
        socb @bits+6,*hl                ; SET 6,(HL)        ; Set main loop flag
        .ret                            ; RET               ;
 
@@ -428,8 +421,7 @@ init_stage_11:                         ; >82f6
 * Used by the routines at #R$8170 and #R$82BF.
 display_player:                        ; >830e
        movb @status_flags,a            ; LD A,($71EB)      ; Status flags
-       movb a,r0                       ; BIT 7,A           ; Check bit for 2 players
-       andi r0,>8000                   ;
+       czc  @bit7,a                    ; BIT 7,A           ; Check bit for two players
        jeq  display_player_1           ; RET Z             ; Return if not set
        li   hl,player_msg              ; LD HL,$8581       ; PLAYER 1 message
        li   de,>192c                   ; LD DE,$192C       ; VDP address
@@ -450,7 +442,7 @@ display_player_1:
 stage_completed:                       ; >832a
        movb @bytes+>08,a               ; LD A,$08          ; Set counter for later
        movb a,@counter_stage_completed ; LD ($7259),A      ; ...
-       li   hl,status_flags            ; LD HL,$71EB       ; Clear main loop flag
+       li   hl,status_flags            ; LD HL,$71EB       ; Reset main loop flag
        szcb @bits+6,*hl                ; RES 6,(HL)        ; ...
 ;       .call @read_register            ; CALL $1FDC        ; READ_REGISTER
        movb *hl,r0                     ; BIT 3,(HL)        ; If bit 3 is set
@@ -485,8 +477,8 @@ stage_completed_3:                     ; >8368
        .call @call_play_sound          ; CALL $9EA3        ; ...
 stage_completed_4:                     ; >836d
        li   hl,status_flags            ; LD HL,$71EB       ;
-       socb @bits+0,*hl                ; SET 0,(HL)        ;
-       socb @bits+4,*hl                ; SET 4,(HL)        ;
+       socb @bits+0,*hl                ; SET 0,(HL)        ; Set warp flag
+       socb @bits+4,*hl                ; SET 4,(HL)        ; Set init flag
        movb @stage,a                   ; LD A,($7200)      ; Stage
        movb a,b                        ; LD B,A            ; B = stage
        andi a,>0300                    ; AND $03           ; Stage mod 4
@@ -539,8 +531,8 @@ stage_completed_8:                     ; >83cb
 * Used by the routine at #R$832A.
 next_stage:                            ; >83d0
        li   hl,status_flags            ; LD HL,$71EB       ; Flags
-       szcb @bits+0,*hl                ; RES 0,(HL)        ;
-       szcb @bits+1,*hl                ; RES 1,(HL)        ;
+       szcb @bits+0,*hl                ; RES 0,(HL)        ; Reset warp flag
+       szcb @bits+1,*hl                ; RES 1,(HL)        ; Reset all waves completed
        sb   a,a                        ; XOR A             ;
        movb a,@wave                    ; LD ($7201),A      ; Clear wave
        movb a,@enemies_hit             ; LD ($7202),A      ; Clear enemies destroyed
@@ -555,7 +547,7 @@ next_stage:                            ; >83d0
 next_stage_1:                          ; >83ec
        movb a,@stage                   ; LD ($7200),A      ; Save stage
        li   hl,status_flags            ; LD HL,$71EB       ; Flags
-       szcb @bits+3,*hl                ; RES 3,(HL)        ; Reset bit 3
+       szcb @bits+3,*hl                ; RES 3,(HL)        ; Reset chance stage flag
        movb @stage,a                   ; LD A,($7200)      ; Stage
        andi a,>0300                    ; AND $03           ; Mod 4
        cb   a,@bytes+>03               ; CP $03            ; Is it a chance stage?
@@ -1150,8 +1142,7 @@ _8705:                                 ; >8705
 * Sprite type $03 (double shot pickup)
 sprite_handler_03:
        movb @status_flags,a            ; LD A,($71EB)      ; Check if you have died
-       movb a,r0                       ; BIT 2,A           ; ...
-       andi r0,>0400                   ;
+       czc  @bit2,a                    ; BIT 2,A           ; ...
        jeq  !                          ; JP NZ,$8654       ; If so, deallocate and return
        b    @deallocate_enemy          ;
 !
@@ -1190,8 +1181,7 @@ sprite_handler_03:
 sprite_handler_15_17:
        movb @bytes+>f8,b               ; LD B,$07          ; Mask = 7
        movb @status_flags,a            ; LD A,($71EB)      ; Check if you have died
-       movb a,r0                       ; BIT 2,A           ; ...
-       andi r0,>0400                   ;
+       czc  @bit2,a                    ; BIT 2,A           ; ...
        jeq  _8751                      ; JR Z,$8751        ; If not, skip next
        movb @bytes+>fc,b               ; LD B,$03          ; Else set mask = 3
 _8751:                                 ; >8751
@@ -1209,8 +1199,7 @@ _875d:                                 ; >875d
        .ret                            ;
 !
        movb @other_flags,a             ; LD A,($7256)      ; If bit 3 is reset
-       movb a,r0                       ; BIT 3,A           ; ...
-       andi r0,>0800                   ;
+       czc  @bit3,a                    ; BIT 3,A           ; ...
        jne  !                          ; JP Z,$8654        ; Then deallocate
        b    @deallocate_enemy          ;
 !
@@ -2354,8 +2343,7 @@ create_laser_fence_or_meteor:          ; >8d50
        .ret                            ;
 !
        movb @status_flags,a            ; LD A,($71EB)      ; Is it chance stage?
-       movb a,r0                       ; BIT 3,A           ; ...
-       andi r0,>0800                   ;
+       czc  @bit3,a                    ; BIT 3,A           ; ...
        jeq  !                          ; RET NZ            ; Then return
        .ret                            ;
 !
@@ -2471,8 +2459,7 @@ enemy_movement_table:                  ; >8e25
 * Used by the routines at #R$80E8, #R$8139 and #R$A3E1.
 create_or_display_mines:               ; >8e2d
        movb @status_flags,a            ; LD A,($71EB)      ; Get flags
-       movb a,r0                       ; BIT 1,A           ; If all waves completed bit is not set
-       andi r0,>0200                   ;
+       czc  @bit1,1                    ; BIT 1,A           ; If all waves completed bit is not set
        jeq  init_mine_variables        ; JR Z,$8E89        ; Then init variables
        movb @mines_action,a            ; LD A,($7264)      ; Get mines action (0-2)
        cb   a,one                      ; CP $01            ; If 1
@@ -2483,14 +2470,12 @@ create_or_display_mines:               ; >8e2d
        b    @_8f55                     ;
 !
        movb @status_flags,a            ; LD A,($71EB)      ; If died
-       movb a,r0                       ; BIT 2,A           ; ...
-       andi r0,>0400                   ;
+       czc  @bit2,a                    ; BIT 2,A           ; ...
        jeq  !                          ; RET NZ            ; Then return
        .ret                            ;
 !
        movb @other_flags,a             ; LD A,($7256)      ; If mines flag is set
-       movb a,r0                       ; BIT 2,A           ; ...
-       andi r0,>0400                   ;
+       czc  @bit2,a                    ; BIT 2,A           ; ...
        jeq  !                          ; RET NZ            ; The return
        .ret                            ;
 !
@@ -2572,8 +2557,7 @@ create_mines:                          ; >8e9d
        li   hl,three_spheres_graphics  ; LD HL,$9056       ; 3 spheres graphics (if double shot on)
        movb @bytes+>40,@c              ; LD C,$40          ; Color
        movb @other_flags,a             ; LD A,($7256)      ; Test double shot flag
-       movb a,r0                       ; BIT 1,A           ; ...
-       andi r0,>0200                   ;
+       czc  @bit1,a                    ; BIT 1,A           ; ...
        jne  _8ec2                      ; JR NZ,$8EC2       ; If set then skip ahead
        li   hl,mine_graphics           ; LD HL,$9096       ; Mine graphics (if double shot off)
        movb @bytes+>90,@c              ; LD C,$90          ;
@@ -2674,8 +2658,7 @@ _8f5e:                                 ; >8f5e
        socb @l,a                       ; OR L              ; ...
        jeq  _8fc6                      ; JR Z,$8FC6        ; Then return
        movb @status_flags,a            ; LD A,($71EB)      ; Test died flag
-       movb a,r0                       ; BIT 2,A           ; ...
-       andi r0,>0400                   ;
+       czc  @bit2,a                    ; BIT 2,A           ; ...
        jne  _8fed                      ; JR NZ,$8FED       ; If we died then destroy mine
        movb @destroy_mines_flag,a      ; LD A,($7265)      ; Test flag
        movb a,r0                       ; BIT 0,A           ; If set
@@ -3378,7 +3361,7 @@ handle_shot_collision:                 ; >9861
        movb @other_flags,a             ; LD A,($7256)      ; Flags
        movb a,@c                       ; LD C,A            ; C = flags
 * Check collision with sprites
-       li   iy,sprite_data_2                   ; LD IY,$701A       ; Data for sprite  2
+       li   iy,sprite_data_2           ; LD IY,$701A       ; Data for sprite  2
        movb @bytes+>1e,b               ; LD B,$1E          ; 30 sprites
        li   de,>000c                   ; LD DE,$000C       ; Size of each sprite
 _986e:                                 ; >986e
@@ -3544,12 +3527,10 @@ _9936:                                 ; >9936
        sb   one,*hl                    ; DEC (HL)          ; ...
        jne  add_points_in_de           ; JR NZ,$9999       ; If still active enemies then add default points
        movb @status_flags,a            ; LD A,($71EB)      ; Are all waves complete?
-       movb a,r0                       ; BIT 1,A           ; ...
-       andi r0,>0200                   ;
+       czc  @bit1,a                    ; BIT 1,A           ; ...
        jeq  add_points_from_enemy      ; JR Z,$9978        ; If not add points from enemy
        movb @other_flags,a             ; LD A,($7256)      ; Test wave flag
-       movb a,r0                       ; BIT 5,A           ; ...
-       andi r0,>2000                   ;
+       czc  @bit5,a                    ; BIT 5,A           ; ...
        jne  add_points_in_de           ; JR NZ,$9999       ; If not wave then add default points
        movb @center_map_entries,a      ; LD A,($722B)      ; Get center enemies
 ;       socb a,a                        ; OR A              ; Is it zero?
@@ -3621,8 +3602,7 @@ shot_hit_mine:                         ; >99b1
        movb @bytes+>08,a               ; LD A,$08          ; Play sound
        .call @call_play_sound          ; CALL $9EA3        ; ...
        movb @other_flags,a             ; LD A,($7256)      ; If double shot is enabled
-       movb a,r0                       ; BIT 1,A           ; ...
-       andi r0,>0200                   ;
+       czc  @bit1,a                    ; BIT 1,A           ; ...
        jne  _99d3                      ; JR NZ,$99D3       ; Then skip offering double shot
        li   hl,offer_double_shot_flag  ; LD HL,$726E       ; Set flag for offering double shot
        socb @bits+0,*hl                ; SET 0,(HL)        ; ...
@@ -3931,8 +3911,7 @@ stage_init_loop:                       ; >a3b6
        sb   a,a                        ; XOR A             ; ...
        bl   @fill_vram                  ; CALL $1F82        ; FILL_VRAM
        movb @status_flags,a            ; LD A,($71EB)      ; Status
-       movb a,r0                       ; BIT 7,A           ; Check bit for 2 players
-       andi r0,>8000                   ;
+       czc  @bit7,a                    ; BIT 7,A           ; Check bit for two players
        jeq  initial_game_loop_1        ; RET Z             ; Return if not
        li   hl,>192c                   ; LD HL,$192C       ; Clear player message
        li   de,>0008                   ; LD DE,$0008       ; ...
@@ -3953,23 +3932,23 @@ explode:                               ; >a3e1
        movb a,@sprite_data_1           ; LD ($700E),A      ; 2nd sprite
        movb @active_shots,a            ; LD A,($7253)      ; Active shots
 ;       socb a,a                        ; OR A              ; If zero
-       jeq  explode_3                      ; JR Z,$A413        ; Then skip ahead
+       jeq  explode_3                  ; JR Z,$A413        ; Then skip ahead
 * Deallocate all shots
        li   ix,sprite_data             ; LD IX,$7002       ; Sprite data table
        li   de,>000c                   ; LD DE,$000C       ; Size of each sprite
        movb @bytes+>20,b               ; LD B,$20          ; 32 sprites
        movb @bytes+>02,a               ; LD A,$02          ; Is it type $02 (shot)?
-explode_1:                                 ; >a402
+explode_1:                             ; >a402
        cb   a,*ix                      ; CP (IX+$00)       ; ...
-       jne  explode_2                      ; JR NZ,$A40F       ; No, then skip
+       jne  explode_2                  ; JR NZ,$A40F       ; No, then skip
        movb @bytes+>7f,*ix             ; LD (IX+$00),$7F   ; Set as not allocated
        movb @bytes+>f8,@>08(ix)        ; LD (IX+$08),$F8   ; Set y
-explode_2:                                 ; >a40f
+explode_2:                             ; >a40f
        a    de,ix                      ; ADD IX,DE         ; Next sprite
        sb   one,b                      ; DJNZ $A402        ; Loop 32 times
        jne  explode_1                      ;
 * Set center of projection for explosion
-explode_3:                                 ; >a413
+explode_3:                              ; >a413
 ;       mov  @sprite_data+>0008,hl      ; LD HL,($700A)     ; Y and X of 1st sprite
        movb @sprite_data+8,@l
        movb @sprite_data+9,h
@@ -3978,7 +3957,7 @@ explode_3:                                 ; >a413
        ai   hl,>0404
        mov  hl,@tmp_center_of_projection ; LD ($72C5),HL     ; Save it in #R$72C5, which will be copied to #R$7000
        movb @sprite_data+>0002,a       ; LD A,($7004)      ; Byte 2 of 1st sprite
-       movb a,@tmp_sprite_data                   ; LD ($72C7),A      ; Save it temporary
+       movb a,@tmp_sprite_data         ; LD ($72C7),A      ; Save it temporary
 * Allocate 6 sprites for explosion
        li   iy,_a4b8                   ; LD IY,$A4B8       ;
        movb @bytes+>06,b               ; LD B,$06          ; Allocate 6 sprites
@@ -3989,14 +3968,14 @@ explode_4:                                 ; >a429
        movb @zero,@>02(ix)             ; LD (IX+$02),$00   ; Polar x
        movb @bytes+>09,@>0b(ix)        ; LD (IX+$0B),$09   ; Set color (pink)
        bl   @load_sprite_pattern_fast  ; RST $30           ; Load sprite pattern
-       movb @tmp_sprite_data,a                   ; LD A,($72C7)      ; Restore byte 2 of 1st sprite
+       movb @tmp_sprite_data,a         ; LD A,($72C7)      ; Restore byte 2 of 1st sprite
        ab   *iy,a                      ; ADD A,(IY+$00)    ; Add data from table
        andi a,>3f00                    ; AND $3F           ; Mod $40
        movb a,@>02(ix)                 ; LD (IX+$02),A     ; Set polar x on new sprite
        movb @bytes+>2a,@>01(ix)        ; LD (IX+$01),$2A   ; Set polar y
        inc  iy                         ; INC IY            ; Next init data
        sb   one,b                      ; DJNZ $A429        ; Loop for 6 sprites
-       jne  explode_4                      ;
+       jne  explode_4                  ;
 * Game loop for 3 seconds
        movb @bytes+>14,b               ; LD B,$14          ; 20
 explode_loop_1:                        ; >a450
@@ -4014,10 +3993,10 @@ explode_loop_2:                        ; >a459
        .call @next_frame_upl_sprites   ; CALL $84B1        ; Upload sprites
        .pop bc                         ; POP BC            ;
        sb   one,b                      ; DJNZ $A459        ; Loop 9 times
-       jne  explode_loop_2                      ;
+       jne  explode_loop_2             ;
        .pop bc                         ; POP BC            ;
        sb   one,b                      ; DJNZ $A450        ; Loop 20 times
-       jne  explode_loop_1                      ;
+       jne  explode_loop_1             ;
        .ret                            ; RET               ;
 
 * Move explosion dots
@@ -4041,8 +4020,7 @@ move_dots_1:                           ; >a47d
        movb d,@>08(ix)                 ; LD (IX+$08),D     ; Set y
        movb @e,@>09(ix)                ; LD (IX+$09),E     ; Set x
        movb @status_flags,a            ; LD A,($71EB)      ; Status
-       movb a,r0                       ; BIT 2,A           ; Test bit
-       andi r0,>0400                   ;
+       czc  @bit2,a                    ; BIT 2,A           ; Test bit
        jne  move_dots_2                ; JR NZ,$A4A0       ; If 1, decrement polar y
        ab   one,@>01(ix)               ; INC (IX+$01)      ; Else increment polar y
        jmp  move_dots_3                ; JR $A4A3          ; Skip next
@@ -4265,8 +4243,7 @@ control_ship_2:                        ; >a76d
 * Handle fire
 control_ship_3:                        ; >a781
        movb @status_flags,a            ; LD A,($71EB)      ; Test stage init flag
-       movb a,r0                       ; BIT 4,A           ; Return if set
-       andi r0,>1000                   ;
+       czc  @bit4,a                    ; BIT 4,A           ; Return if set
        jne  control_ship_5             ; RET NZ            ; ...
 ;       mov  @countdown_to_wave,hl      ; LD HL,($71F0)     ; Controller: #R$71F1
        movb  @current_player,h
@@ -4281,8 +4258,7 @@ control_ship_3:                        ; >a781
        .pop af                         ; POP AF            ; Restore fire segment 0
        socb h,a                        ; OR H              ; Combine with fire segment 1
        li   hl,other_flags             ; LD HL,$7256       ; Flags
-       movb a,r0                       ; BIT 6,A           ; Test fire pressed
-       andi r0,>4000                   ;
+       czc  @bit6,a                    ; BIT 6,A           ; Test fire pressed
        jeq  clear_fire_pressed         ; JR Z,$A805        ; If not, clear bit for fire pressed, and return
        movb *hl,r0                     ; BIT 0,(HL)        ; Check if fire was pressed last time
        andi r0,>0100                   ;
@@ -4534,22 +4510,22 @@ deallocate_map_entry:                  ; >aae3
 create_sprite_from_map_entry:          ; >aaf1
        movb @status_flags,a            ; LD A,($71EB)      ; Is all waves completed flag set?
        czc  @bit1,a                    ; BIT 1,A           ; ...
-       jeq  create_sprite_from_map_entry_2 ; RET Z             ; Return if not
+       jeq  create_sprite_from_map_entry_2 ; RET Z         ; Return if not
        czc  @bit2,a                    ; BIT 2,A           ; Is died flag set?
-       jne  create_sprite_from_map_entry_2 ; RET NZ            ; Return if so
+       jne  create_sprite_from_map_entry_2 ; RET NZ        ; Return if so
        bl   @stage_data_addr           ; CALL $84DB        ; Get stage data address in IY
        movb @active_enemies,a          ; LD A,($722C)      ; Get number of active enemies
        cb   a,@>04(iy)                 ; CP (IY+$04)       ; Compare with byte 4 of stage data
-       jhe  create_sprite_from_map_entry_2 ; RET NC            ; Return if active enemies >= byte 4
+       jhe  create_sprite_from_map_entry_2 ; RET NC        ; Return if active enemies >= byte 4
        movb @center_map_entries,a      ; LD A,($722B)      ; Get number of map entries
 ;       socb a,a                        ; OR A              ; Return if zero
-       jeq  create_sprite_from_map_entry_2 ; RET Z             ; ...
+       jeq  create_sprite_from_map_entry_2 ; RET Z         ; ...
        li   hl,center_enemy_map+>0023  ; LD HL,$722A       ; End of #R$7207
        movb @bytes+>24,b               ; LD B,$24          ; Size of map
        movb @bytes+>80,a               ; LD A,$80          ; Value to compare with
 create_sprite_from_map_entry_1:        ; >ab10
        cb   a,*hl                      ; CP (HL)           ; Test map byte
-       jhe  create_sprite_from_map_entry_3 ; JR NC,$AB17       ; If map byte <= $80 then found
+       jhe  create_sprite_from_map_entry_3 ; JR NC,$AB17   ; If map byte <= $80 then found
        dec  hl                         ; DEC HL            ; Previous byte
        sb   one,b                      ; DJNZ $AB10        ; Loop through whole map
        jne  create_sprite_from_map_entry_1 ;
@@ -4560,7 +4536,7 @@ create_sprite_from_map_entry_3:        ; >ab17
        movb *hl,a                      ; LD A,(HL)         ; Get value from map
        .push af                        ; PUSH AF           ; Save it
        .call @deallocate_map_entry     ; CALL $AAE3        ; Deallocate map entry
-       bl   @polar_coord_from_map     ; CALL $AB38        ; Now DE contains polar y,x
+       bl   @polar_coord_from_map     ; CALL $AB38         ; Now DE contains polar y,x
        bl   @allocate_sprite           ; RST $28           ; Allocate sprite
        movb @e,@>02(ix)                ; LD (IX+$02),E     ; Set polar x
        movb d,@>01(ix)                 ; LD (IX+$01),D     ; Set polar x
