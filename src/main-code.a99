@@ -1305,7 +1305,8 @@ move_to_center_1:                      ; >87e7
 ;      Not found
 ;       movb @>0a(ix),a                 ; LD A,(IX+$0A)     ; Get pattern
 ;       socb @bytes+>80,a               ; OR $80            ; Set bit 7
-       b    @allocate_map_entry        ; JP $AAA6          ; Add pattern to map. Return to #R$8A41
+       bl   @allocate_map_entry        ; JP $AAA6          ; Add pattern to map. Return to #R$8A41
+       jmp  move_to_center_5
 ;      Found
 move_to_center_2:                      ; >87f5
        dec  hl
@@ -2330,7 +2331,7 @@ reset_outcoming_enemies:               ; >8d21
        srl  a,4
        andi a,>0f00                    ; AND $0F           ; ...
 reset_outcoming_enemies_1:                                 ; >8d43
-       .call @allocate_map_entry       ; CALL $AAA6        ; Return enemies to center
+       bl   @allocate_map_entry        ; CALL $AAA6        ; Return enemies to center
        sb   one,b                      ; DJNZ $8D43        ; ...
        jne  reset_outcoming_enemies_1                      ;
        sb   a,a                        ; XOR A             ; Reset outcoming enemies
@@ -3585,7 +3586,7 @@ add_points_in_de:                      ; >9999
 * I:HL Map address of other
 shot_hit_center_enemy:                 ; >99a0
        movb *hl,d                      ; LD D,(HL)         ; Get map entry (color)
-       .call @deallocate_map_entry     ; CALL $AAE3        ; Deallocate map entry
+       bl   @deallocate_map_entry     ; CALL $AAE3        ; Deallocate map entry
        .call @remove_shot              ; CALL $9A1C        ; Remove shot
        movb one,a                      ; LD A,$01          ; Play sound
        .call @call_play_sound          ; CALL $9EA3        ; ...
@@ -4444,9 +4445,9 @@ init_center_enemies:                   ; >aa7d
 *
 * I: A value to place in #R$7207 at an unused spot
 allocate_map_entry:                    ; >aaa6
-       .push hl                        ; PUSH HL           ;
-       .push de                        ; PUSH DE           ;
-       .push bc                        ; PUSH BC           ;
+;       .push hl                        ; PUSH HL           ;
+;       .push de                        ; PUSH DE           ;
+;       .push bc                        ; PUSH BC           ;
        .push af                        ; PUSH AF           ; Save value to write
        movb @center_map_entries,a      ; LD A,($722B)      ; Get number of entries
        cb   a,@bytes+>24               ; CP $24            ; If map is full
@@ -4454,42 +4455,43 @@ allocate_map_entry:                    ; >aaa6
        movb @status_flags,a            ; LD A,($71EB)      ; If all waves completed flag is set
        czc  @bit1,a                    ; BIT 1,A           ; The search backwards
        jne  allocate_map_entry_3       ; JR NZ,$AAC6       ; Else search forwards
-       li   hl,center_enemy_map+>0023  ; LD HL,$722A       ; Start at end of #R$7207
+       li   r0,center_enemy_map+>0023  ; LD HL,$722A       ; Start at end of #R$7207
        movb @b255,a                    ; LD A,$FF          ; Byte to search for
 allocate_map_entry_1:                  ; >aabd
-       cb   a,*hl                      ; CP (HL)           ; Check byte
+       cb   a,*r0                      ; CP (HL)           ; Check byte
        jne  allocate_map_entry_2       ; JR NZ,$AAC3       ; Break out if not $FF
-       dec  hl                         ; DEC HL            ; Previous address
+       dec  r0                         ; DEC HL            ; Previous address
        jmp  allocate_map_entry_1       ; JR $AABD          ; Loop forever
 allocate_map_entry_2:                  ; >aac3
-       inc  hl                         ; INC HL            ; HL now points to group of $FF at the end of buffer
+       inc  r0                         ; INC HL            ; HL now points to group of $FF at the end of buffer
        jmp  allocate_map_entry_5       ; JR $AAD1          ; Skip next loop
 allocate_map_entry_3:                  ; >aac6
-       li   hl,center_enemy_map        ; LD HL,$7207       ; Start at beginning of #R$7207
+       li   r0,center_enemy_map        ; LD HL,$7207       ; Start at beginning of #R$7207
        movb @b255,a                    ; LD A,$FF          ; Byte to search for
 allocate_map_entry_4:                  ; >aacb
-       cb   a,*hl+                     ; CP (HL)           ; Check byte
+       cb   a,*r0+                     ; CP (HL)           ; Check byte
        jeq  allocate_map_entry_4a      ; JR Z,$AAD1        ; Break out if found HL now points to first $FF in buffer
 ;      inc  hl                         ; INC HL            ; Next address
        jmp  allocate_map_entry_4       ; JR $AACB          ; Loop forever
 allocate_map_entry_4a:
-       dec  hl
+       dec  r0
 allocate_map_entry_5:                  ; >aad1
        .pop af                         ; POP AF            ; Restore value to write
-       movb a,*hl                      ; LD (HL),A         ; Set byte to A
+       movb a,*r0                      ; LD (HL),A         ; Set byte to A
 ;       li   hl,center_map_entries      ; LD HL,$722B       ; Increment number of entries
 ;       ab   one,*hl                    ; INC (HL)          ; ...
        ab   one,@center_map_entries
-       li   hl,center_enemies_redraw   ; LD HL,$72CC       ; Set flag
-       socb @bits+0,*hl                ; SET 0,(HL)        ; ...
+;       li   r0,center_enemies_redraw   ; LD HL,$72CC       ; Set flag
+;       socb @bits+0,*r0                ; SET 0,(HL)        ; ...
+       socb @bits+0,@center_enemies_redraw
        jmp  allocate_map_entry_7       ; JR $AADF          ; Skip popping AF
 allocate_map_entry_6:                  ; >aade
        .pop af                         ; POP AF            ;
 allocate_map_entry_7:                  ; >aadf
-       .pop bc                         ; POP BC            ;
-       .pop de                         ; POP DE            ;
-       .pop hl                         ; POP HL            ;
-       .ret                            ; RET               ;
+;       .pop bc                         ; POP BC            ;
+;       .pop de                         ; POP DE            ;
+;       .pop hl                         ; POP HL            ;
+       rt                              ; RET               ;
 
 * Deallocate map entry
 *
@@ -4506,7 +4508,7 @@ deallocate_map_entry:                  ; >aae3
 ;       sb   one,*hl                    ; DEC (HL)          ; ...
        sb   one,@center_map_entries
 ;       .pop hl                         ; POP HL            ; Restore map address
-       .ret                            ; RET               ;
+       rt                               ; RET               ;
 
 * Create enemy sprite from map entry
 *
@@ -4540,7 +4542,7 @@ create_sprite_from_map_entry_2:
 create_sprite_from_map_entry_3:        ; >ab17
        movb *hl,a                      ; LD A,(HL)         ; Get value from map
        .push af                        ; PUSH AF           ; Save it
-       .call @deallocate_map_entry     ; CALL $AAE3        ; Deallocate map entry
+       bl   @deallocate_map_entry     ; CALL $AAE3        ; Deallocate map entry
        bl   @polar_coord_from_map     ; CALL $AB38         ; Now DE contains polar y,x
        bl   @allocate_sprite           ; RST $28           ; Allocate sprite
        movb @e,@>02(ix)                ; LD (IX+$02),E     ; Set polar x
@@ -4593,27 +4595,29 @@ polar_coord_from_map:                  ; >ab38
 deallocate_sprite_from_map:            ; >ab53
        movb @>07(ix),r0                ; BIT 6,(IX+$07)    ; Test bit
        andi r0,>4000                   ;
-       jne  !                          ; RET Z             ; Return if not set
-       .ret                            ;
-!
+       jeq  deallocate_sprite_from_map_4 ; RET Z             ; Return if not set
        .push hl                        ; PUSH HL           ;
-       .push bc                        ; PUSH BC           ;
+;       .push bc                        ; PUSH BC           ;
        li   hl,center_enemy_map        ; LD HL,$7207       ; Map address
-       movb @bytes+>24,b               ; LD B,$24          ; Size of map
+;       movb @bytes+>24,b               ; LD B,$24          ; Size of map
+       li   r2,>0024
        movb @>0a(ix),a                 ; LD A,(IX+$0A)     ; Get sprite pattern
        socb @bytes+>80,a               ; OR $80            ; Set bit 7
-_ab64:                                 ; >ab64
-       cb   a,*hl                      ; CP (HL)           ; Compare with map entry
-       jeq  _ab6c                      ; JR Z,$AB6C        ; Break out if found
-       inc  hl                         ; INC HL            ; Next map address
-       sb   one,b                      ; DJNZ $AB64        ; Loop through whole map
-       jne  _ab64                      ;
-       jmp  _ab6f                      ; JR $AB6F          ; Not found - return
-_ab6c:                                 ; >ab6c
-       .call @deallocate_map_entry     ; CALL $AAE3        ; Deallocate map entry
-_ab6f:                                 ; >ab6f
-       .pop bc                         ; POP BC            ;
+deallocate_sprite_from_map_1:          ; >ab64
+       cb   a,*hl+                     ; CP (HL)           ; Compare with map entry
+       jeq  deallocate_sprite_from_map_2 ; JR Z,$AB6C        ; Break out if found
+;      inc  hl                         ; INC HL            ; Next map address
+;       sb   one,b                      ; DJNZ $AB64        ; Loop through whole map
+       dec  r2
+       jne  deallocate_sprite_from_map_1 ;
+       jmp  deallocate_sprite_from_map_3 ; JR $AB6F          ; Not found - return
+deallocate_sprite_from_map_2:           ; >ab6c
+       dec  hl
+       bl   @deallocate_map_entry     ; CALL $AAE3        ; Deallocate map entry
+deallocate_sprite_from_map_3:          ; >ab6f
+;       .pop bc                         ; POP BC            ;
        .pop hl                         ; POP HL            ;
+deallocate_sprite_from_map_4:
        .ret                            ; RET               ;
 
 * Display distant enemies at the center of the screen
@@ -4624,7 +4628,7 @@ display_center_enemies:                ; >ab72
        li   hl,update_counters_countdown ; LD HL,$72CB       ; Countdown for when to update counters
        sb   one,*hl                    ; DEC (HL)          ; -1
        jlt  !                          ; JP P,$ABA0        ; If > 0, then don't update other counters
-       b    @_aba0                     ;
+       b    @display_center_enemies_2  ;
 !
        movb @bytes+>0f,*hl             ; LD (HL),$0F       ; Reset to 15
        movb @center_y_offset,a         ; LD A,($72D3)      ; Y offset
@@ -4637,7 +4641,7 @@ display_center_enemies:                ; >ab72
        andi af,>ff00
        abs a
        cb   a,one                      ; CP $01            ; If not 1
-       jne  _ab9b                      ; JR NZ,$AB9B       ; Then skip ahead
+       jne  display_center_enemies_1   ; JR NZ,$AB9B       ; Then skip ahead
        movb *hl,a                      ; LD A,(HL)         ; IF 1, get direction
        neg a                           ; NEG               ; Reverse direction
        movb a,*hl                      ; LD (HL),A         ; Store direction
@@ -4645,10 +4649,10 @@ display_center_enemies:                ; >ab72
        ab   one,a                      ; INC A             ; +1
        andi a,>3f00                    ; AND $3F           ; Mod 64
        movb a,@center_x_offset         ; LD ($72D4),A      ; Store x offset
-_ab9b:                                 ; >ab9b
+display_center_enemies_1:              ; >ab9b
        li   hl,center_enemies_redraw   ; LD HL,$72CC       ; Set flag
        socb @bits+0,*hl                ; SET 0,(HL)        ; ...
-_aba0:                                 ; >aba0
+display_center_enemies_2:              ; >aba0
        movb @center_enemy_processed,a  ; LD A,($72CD)      ; Get enemy to process
        cb   a,@bytes+>24               ; CP $24            ; If 36,
        jne  !                          ; JP Z,$ABFF        ; Then jump to update name table
@@ -4656,7 +4660,7 @@ _aba0:                                 ; >aba0
 !
 ;       socb a,a                        ; OR A              ; If 0 then erase all enemies
        movb a,a
-       jne  _abc4                      ; JR NZ,$ABC4       ; Else jump ahead
+       jne  display_center_enemies_3   ; JR NZ,$ABC4       ; Else jump ahead
        mov  @center_enemies_name_2,hl  ; LD HL,($72CF)     ; Get first name used for center enemies
        sb   h,h                        ; LD H,$00          ; Set MSB to 0
 ;       a    hl,hl                      ; ADD HL,HL         ; Multiply by 8
@@ -4670,7 +4674,7 @@ _aba0:                                 ; >aba0
        sb   a,a                        ; XOR A             ; ...
        bl   @unrolled_fill_vram        ; CALL $1F82        ; FILL_VRAM
        movb @center_enemy_processed,a  ; LD A,($72CD)      ; Get enemy to process
-_abc4:                                 ; >abc4
+display_center_enemies_3:              ; >abc4
        movb a,@c                       ; LD C,A            ; BC = enemy to process
        sb   b,b                        ; LD B,$00          ; ...
        li   hl,center_enemy_map        ; LD HL,$7207       ; Add map address
@@ -4678,7 +4682,7 @@ _abc4:                                 ; >abc4
        movb *hl,r0                     ; BIT 7,(HL)        ; If unallocated
        andi r0,>8000                   ;
        jeq  !                          ; JP NZ,$ABFA       ; Then update counter and return
-       b    @_abfa                     ;
+       b    @display_center_enemies_5  ;
 !
        bl   @polar_coord_from_map     ; CALL $AB38        ; Now DE contains polar y,x
        bl   @polar_to_screen          ; CALL $B1C6        ; Convert polar to screen
@@ -4695,20 +4699,20 @@ _abc4:                                 ; >abc4
        bl   @plot_pixel               ; CALL $AC47        ; Plot pixel
        movb *hl,a                      ; LD A,(HL)         ; Get x offset
 ;       socb a,a                        ; OR A              ; If zero
-       jeq  _abef                      ; JR Z,$ABEF        ; Then skip ahead
+       jeq  display_center_enemies_4   ; JR Z,$ABEF        ; Then skip ahead
        ab   @e,a                       ; ADD A,E           ; Add to screen x
        movb a,@e                       ; LD E,A            ; ...
        bl   @plot_pixel               ; CALL $AC47        ; Plot pixel
-_abef:                                 ; >abef
+display_center_enemies_4:              ; >abef
        inc  hl                         ; INC HL            ; Next table address
        .pop de                         ; POP DE            ; Restore screen coordinates
        movb *hl,a                      ; LD A,(HL)         ; Get y offset
 ;       socb a,a                        ; OR A              ; If zero
-       jeq  _abfa                      ; JR Z,$ABFA        ; Then skip ahead
+       jeq  display_center_enemies_5   ; JR Z,$ABFA        ; Then skip ahead
        ab   d,a                        ; ADD A,D           ; Add to screen x
        movb a,d                        ; LD D,A            ; ...
        bl   @plot_pixel               ; CALL $AC47        ; Plot pixel
-_abfa:                                 ; >abfa
+display_center_enemies_5:              ; >abfa
        li   hl,center_enemy_processed  ; LD HL,$72CD       ; Update counter
        ab   one,*hl                    ; INC (HL)          ; ...
        .ret                            ; RET               ;
@@ -4755,7 +4759,7 @@ display_center_enemies_names_1:         ; >ac15
        ai   de,>0020
 ;       sb   one,@c                     ; DEC C             ; Row counter
        dec  bc
-       jne  display_center_enemies_names_1                      ; JR NZ,$AC15       ; Loop for 4 rows
+       jne  display_center_enemies_names_1 ; JR NZ,$AC15       ; Loop for 4 rows
        mov  @center_enemies_name_1,hl  ; LD HL,($72CE)     ; Swap #R$72CE and #R$72CF
 ;       movb @l,a                       ; LD A,L            ; ...
 ;       movb h,@l                       ; LD L,H            ; ...
@@ -4844,14 +4848,14 @@ plot_pixel_2:                          ; >ac5c
        andi a,>0700                    ; AND $07           ; Pixel x offset within pattern
        movb @bytes+>80,b               ; LD B,$80          ; Leftmost pixel
        mov  a,r0
-       jeq  _ac7e                      ; JR Z,$AC7E        ; Skip ahead if zero offset
+       jeq  plot_pixel_3               ; JR Z,$AC7E        ; Skip ahead if zero offset
 ;_ac79:                                 ; >ac79
 ;       srl  b,1                        ; SRL B             ; Shift right 0-7 times
 ;       sb   one,a                      ; DEC A             ; ...
 ;       jne  _ac79                      ; JR NZ,$AC79       ; ...
        swpb r0
        srl  b,0
-_ac7e:                                 ; >ac7e
+plot_pixel_3:                          ; >ac7e
        .ex_de_hl                       ; EX DE,HL          ; DE = VDP address, HL = coordinates
        bl   @vdp_read_byte             ; CALL $9AD0        ; Read VDP byte
        socb b,a                        ; OR B              ; Apply pixel
@@ -4885,14 +4889,14 @@ init_sprite_data:                      ; >acdf
        movb @bytes+>20,b               ; LD B,$20          ; Number of sprites
        sb   a,a                        ; XOR A             ;
        movb a,@allocated_sprites       ; LD ($7182),A      ; Number of allocated sprites
-_acec:                                 ; >acec
+init_sprite_data_1:                    ; >acec
        movb a,@>0a(ix)                 ; LD (IX+$0A),A     ; Set pattern
 * This entry point is used by the routine at #R$AC47.
        movb @b255,*ix                  ; LD (IX+$00),$FF   ; Set as unallocated
        ab   one,a                      ; INC A             ;
        a    de,ix                      ; ADD IX,DE         ; Advance to next sprite
        sb   one,b                      ; DJNZ $ACEC        ; Loop for 32 sprites
-       jne  _acec                      ;
+       jne  init_sprite_data_1         ;
        .ret                            ; RET               ;
 
 * Upload sprite data to VDP
@@ -5549,17 +5553,17 @@ display_stars:                         ; >afff
        movb @bytes+>07,*hl             ; LD (HL),$07       ; Reset counter to 7
        movb @status_flags,a            ; LD A,($71EB)      ; Test warp flag
        czc  @bit0,a                    ; BIT 0,A           ; ...
-       jeq  _b00f                      ; JR Z,$B00F        ; If bit 0 is set then reset counter to 3
+       jeq  display_stars_1            ; JR Z,$B00F        ; If bit 0 is set then reset counter to 3
        movb @bytes+>02,*hl             ; LD (HL),$03       ; ...
-_b00f:                                 ; >b00f
+display_stars_1:                       ; >b00f
        movb @b255,@c                   ; LD C,$00          ; Set mask to undraw (swapped since we use szcb)
        .call @display_star_frame       ; CALL $B023        ;
        movb @star_frame,a              ; LD A,($731A)      ; Get star frame
        ab   @bytes+>02,a               ; ADD A,$02         ; Add 2
        cb   a,@bytes+>0c               ; CP $0C            ; < 12 ?
-       jl   _b01e                      ; JR C,$B01E        ; Yes, skip ahead
+       jl   display_stars_2            ; JR C,$B01E        ; Yes, skip ahead
        sb   a,a                        ; XOR A             ;
-_b01e:                                 ; >b01e
+display_stars_2:                       ; >b01e
        movb a,@star_frame              ; LD ($731A),A      ; Set star frame to zero
        sb   @c,@c                      ; LD C,$FF          ; Set mask to draw (swapped since we use szcb)
 
