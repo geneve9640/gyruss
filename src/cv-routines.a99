@@ -85,7 +85,7 @@ init_table_6:
        .endproc
 
 read_register:
-       movb @vdp_status,a
+       movb @vdpsta,a
        rt
 
 write_register:

@@ -35,7 +35,7 @@ new_game:                              ; >8064
        li   hl,>1800                   ; LD HL,$1800       ; Name table address
        li   de,>0300                   ; LD DE,$0300       ; Name table size
        sb   a,a                        ; XOR A             ; Zero
-       bl   @fill_vram                  ; CALL $1F82        ; FILL_VRAM (clear screen)
+       bl   @fill_vram                 ; CALL $1F82        ; FILL_VRAM (clear screen)
        li   hl,>201c                   ; LD HL,$201C       ; Last 4 bytes of color table
        li   de,>0004                   ; LD DE,$0004       ; 4 bytes
        movb @bytes+>f1,a               ; LD A,$F1          ; Set to white/black
@@ -44,7 +44,7 @@ new_game:                              ; >8064
        li   de,frame_counter           ; LD DE,$71F2       ; To $7256
        sb   a,a                        ; XOR A             ; ...
        movb a,*hl                      ; LD (HL),A         ; ...
-       li   bc,other_flags-current_player ; LD BC,$0065       ; ...
+       li   bc,clear_ram_end-clear_ram_start ; LD BC,$0065       ; ...
        .ldir                           ; LDIR              ; ...
        movb @status_flags,a            ; LD A,($71EB)      ; Clear all flags but two-player flag
        andi a,>8000                    ; AND $80           ; ...
@@ -1214,7 +1214,7 @@ _875d:                                 ; >875d
        ab   @>03(ix),a                 ; ADD A,(IX+$03)    ; Add velocity
        andi a,>3f00                    ; AND $3F           ; Mod 64
        movb a,@>02(ix)                 ; LD (IX+$02),A     ; Save new polar x
-       li   hl,_7261                   ; LD HL,$7261       ; Did center reach end 2?
+       li   hl,laser_fence_2_x                   ; LD HL,$7261       ; Did center reach end 2?
        cb   a,*hl                      ; CP (HL)           ; ...
        jeq  _8787                      ; JR Z,$8787        ; Then skip ahead
        inc  hl                         ; INC HL            ; Did center reach end 1?
@@ -1271,7 +1271,7 @@ sprite_handler_0e_11:
        movb @attack_countdown,a        ; LD A,($7260)          ; Attack countdown
 ;       socb a,a                        ; OR A              ; Return if not zero
        jne  !                          ; RET NZ            ; ...
-       .call @maybe_create_enemy_shot  ; CALL $8A76        ; Create enemy shot
+       bl   @maybe_create_enemy_shot  ; CALL $8A76        ; Create enemy shot
        sb   one,@>01(ix)               ; DEC (IX+$01)      ; Decrement polar y
        movb @sprite_data+>0002,a       ; LD A,($7004)      ; Ship polar x
        .call @move_towards_x           ; CALL $8AC0        ; Move towards x
@@ -1396,7 +1396,7 @@ handle_out_of_screen_3:                ; >8853
 *
 * I:IX Sprite data of enemy
 create_enemy_shot_and_move:            ; >885f
-       .call @maybe_create_enemy_shot  ; CALL $8A76        ; Create enemy shot
+       bl   @maybe_create_enemy_shot  ; CALL $8A76        ; Create enemy shot
        movb @>01(ix),a                 ; LD A,(IX+$01)     ; Get polar y
        cb   a,@bytes+>22               ; CP $22            ; Is it < $22
        jl   _8878                      ; JR C,$8878        ; Then jump ahead
@@ -1510,10 +1510,8 @@ _88f3:                                 ; >88f3
 update_sprite_path:                    ; >88fe
        movb @sprite_countdown,a        ; LD A,($71EE)      ;
 ;       socb a,a                        ; OR A              ;
-       jeq  !                          ; RET NZ            ;
-       .ret                            ;
-!
-       .call @maybe_create_enemy_shot  ; CALL $8A76        ; Create enemy shot
+       jne  update_sprite_path_4       ; RET NZ            ;
+       bl   @maybe_create_enemy_shot  ; CALL $8A76        ; Create enemy shot
        movb @>06(ix),@l                ; LD L,(IX+$06)     ; Get path address
        movb @>07(ix),h                 ; LD H,(IX+$07)     ; ...
        movb @>03(ix),a                 ; LD A,(IX+$03)     ; Get counter
@@ -1523,7 +1521,7 @@ update_sprite_path_1:                  ; >890f
        sb   @bytes+>10,a               ; SUB $10           ; Decrement upper nybble
        movb a,@>03(ix)                 ; LD (IX+$03),A     ; Store again
        cb   r0,@bytes+>10
-       jhe  move_animate_sprite_along_path ; JR NC,$8936   ; If upper nybble >= 0, then jump to move sprite
+       jhe  move_animate_sprite_along_path ; JR NC,$8936   ; If upper nybble >= 1, then jump to move sprite
 * This entry point is used by the routine at #R$8986.
 update_sprite_path_2:                  ; >8916
        inc  hl                         ; INC HL            ; Else increment path address
@@ -1536,10 +1534,6 @@ update_sprite_path_2:                  ; >8916
        jlt  set_sprite_flags_to_18_if_match ; JP M,$8986   ; If negative then set sprite flag to $18 if path byte matches and return
        jeq  set_sprite_flags_to_04     ; JR Z,$8994        ; If zero then set sprite flag to $04 and return
        jmp  set_sprite_flags_to_40     ; JP $8999          ; If positive then set sprite flag to $40 and return
-
-* Enemy movement: Upper nybble >= 1
-*
-* Used by the routine at #R$88FE.
 update_sprite_path_3:                  ; >892b
        andi a,>f000                    ; AND $F0           ; Isolate upper nybble
        movb a,b                        ; LD B,A            ; Save it
@@ -1547,6 +1541,8 @@ update_sprite_path_3:                  ; >892b
        andi a,>0f00                    ; AND $0F           ; And apply upper nybble
        socb b,a                        ; OR B              ; ...
        jmp  update_sprite_path_1       ; JR $890F          ; Jump back into #R$88FE
+update_sprite_path_4:
+       .ret
 
 * Enemy movement: Move sprite along path and update sprite type
 *
@@ -1770,7 +1766,7 @@ _8a3c:                                 ; >8a3c
 return_from_sprite_handler:            ; >8a41
        movb *ix,a                      ; LD A,(IX+$00)     ; Get sprite type
        cb   a,@>05(ix)                 ; CP (IX+$05)       ; Same as before?
-       jeq  return_from_sprite_handler_1 ; JR Z,$8A4E        ; Skip ahead if so
+       jeq  return_from_sprite_handler_1 ; JR Z,$8A4E      ; Skip ahead if so
        movb @b255,@>04(ix)             ; LD (IX+$04),$FF   ; Set loaded patten index to none
        bl   @load_sprite_pattern_fast  ; RST $30           ; Load sprite pattern
 * This entry point is used by the routine at #R$867D.
@@ -1809,32 +1805,23 @@ all_sprites_processed_3:
 *
 * Used by the routines at #R$8790, #R$885F and #R$88FE.
 maybe_create_enemy_shot:               ; >8a76
+       .proc
        movb @countdown_to_shoot,a      ; LD A,($71EF)      ; Is countdown zero?
 ;       socb a,a                       ; OR A              ; ...
-       jeq  !                          ; RET NZ            ; Return if not
-       .ret                            ;
-!
+       jne  maybe_create_enemy_shot_1  ; RET NZ            ; Return if not
        movb @active_enemy_shots,a      ; LD A,($7252)      ; Get enemy shots
        cb   a,@bytes+>07               ; CP $07            ; Return if >= 7
-       jl   !                          ; RET NC            ; ...
-       .ret                            ;
-!
+       jhe  maybe_create_enemy_shot_1  ; RET NC            ; ...
        movb @status_flags,a            ; LD A,($71EB)      ; Flags
        andi a,>0c00                    ; AND $0C           ; Is chance stage or died?
-       jeq  !                          ; RET NZ            ; Then return
-       .ret                            ;
-!
+       jne  maybe_create_enemy_shot_1  ; RET NZ            ; Then return
        bl   @stage_data_addr           ; CALL $84DB        ; Get stage data address in IY
        movb @active_enemy_shots,a      ; LD A,($7252)      ; Get enemy shots
        cb   a,@>01(iy)                 ; CP (IY+$01)       ; Compare with stage data byte 1
-       jl   !                          ; RET NC            ; Return if shots >= max shots
-       .ret                            ;
-!
+       jhe  maybe_create_enemy_shot_1  ; RET NC            ; Return if shots >= max shots
        movb @sprite_data+>0002,a       ; LD A,($7004)      ; Ship polar x
        cb   a,@>02(ix)                 ; CP (IX+$02)       ; Compare with sprite polar x
-       jeq  !                          ; RET NZ            ; Return if not equal
-       .ret                            ;
-!
+       jne  maybe_create_enemy_shot_1  ; RET NZ            ; Return if not equal
        movb @>02(iy),a                 ; LD A,(IY+$02)     ; Reset countdown
        movb a,@countdown_to_shoot      ; LD ($71EF),A      ; ...
        li   hl,active_enemy_shots      ; LD HL,$7252       ; Increment enemy shots
@@ -1852,7 +1839,8 @@ maybe_create_enemy_shot:               ; >8a76
        movb @bytes+>12,*ix             ; LD (IX+$00),$12   ; Set sprite type
        movb @bytes+>0a,@>0b(ix)        ; LD (IX+$0B),$0A   ; Set color
        .pop ix                         ; POP IX            ; Restore enemy sprite
-       .ret                            ; RET               ;
+maybe_create_enemy_shot_1:
+       .endproc                        ; RET               ;
 
 * Move towards x
 *
@@ -2385,7 +2373,7 @@ create_laser_fence_or_meteor:          ; >8d50
        bl   @ti_rnd                    ; RST $20           ; Random number
        andi a,>3f00                    ; AND $3F           ; 0-63
        movb a,@>02(ix)                 ; LD (IX+$02),A     ; Set polar x
-       movb a,@_7262                   ; LD ($7262),A      ; Store polar x
+       movb a,@laser_fence_1_x                   ; LD ($7262),A      ; Store polar x
        .push af                        ; PUSH AF           ; Save polar x
        bl   @load_sprite_pattern_fast  ; RST $30           ; Load sprite pattern
        bl   @allocate_sprite           ; RST $28           ; Allocate sprite
@@ -2397,7 +2385,7 @@ create_laser_fence_or_meteor:          ; >8d50
        ab   @bytes+>08,a               ; ADD A,$08         ; Polar x + 8
        andi a,>3f00                    ; AND $3F           ; Mod 64
        movb a,@>02(ix)                 ; LD (IX+$02),A     ; Set polar x
-       movb a,@_7261                   ; LD ($7261),A      ; Store polar x
+       movb a,@laser_fence_2_x                   ; LD ($7261),A      ; Store polar x
        bl   @load_sprite_pattern_fast  ; RST $30           ; Load sprite pattern
        bl   @allocate_sprite           ; RST $28           ; Allocate sprite
        movb @bytes+>17,*ix             ; LD (IX+$00),$17   ; Set type to laser fence center

@@ -110,7 +110,7 @@ sprite_allocation_table:               ; >7183
        byte >00,>00,>00,>00,>00,>00,>00,>00
 
 * Temporary storage (72 bytes)
-buffer:                                ; >71a3
+;buffer:                                ; >71a3
        byte >00,>00,>00,>00,>00,>00,>00,>00
        byte >00,>00,>00,>00,>00,>00,>00,>00
        byte >00,>00,>00,>00,>00,>00,>00,>00
@@ -134,7 +134,7 @@ buffer:                                ; >71a3
 * { $06 | Set during main loop }
 * { $07 | Two-player game }
 * TABLE#
-status_flags:                          ; >71eb
+;status_flags:                          ; >71eb
        byte >00
 
 * Stars move countdown
@@ -162,6 +162,9 @@ countdown_to_shoot:                    ; >71ef
 * Reset to 6th byte of stage data. See #R$8541.
 countdown_to_wave:                     ; >71f0
        byte >00
+
+clear_ram_start:
+       equ  $
 
 * Current player (0 or 1)
 current_player:                        ; >71f1
@@ -304,6 +307,9 @@ mines_destroyed:                       ; >7254
 bonus_enemies_hit:                     ; >7255
        byte >00
 
+clear_ram_end:
+       equ  $
+
 * Other flags
 *
 * #TABLE(default, default)
@@ -317,7 +323,7 @@ bonus_enemies_hit:                     ; >7255
 * { $06 | Set when wave starts }
 * { $07 | Unused }
 * TABLE#
-other_flags:                           ; >7256
+;other_flags:                           ; >7256
        byte >00
 
 * Countdown to screen off
@@ -357,15 +363,15 @@ laser_meteor_countdown:                ; >725f
 *
 * Decremented when #R$85E6 is called, and it reset to first byte of level data
 * (x2) by #R$8A53.
-attack_countdown:                  ; >7260
+attack_countdown:                      ; >7260
        byte >00
 
 * Laser fence end 2 polar x
-_7261:                                 ; >7261
+laser_fence_2_x:                       ; >7261
        byte >00
 
 * Laser fence end 1 polar x
-_7262:                                 ; >7262
+laser_fence_1_x:                       ; >7262
        byte >00
 
 * Countdown. Mines are destroyed when zero.
@@ -421,47 +427,47 @@ temp_polar_x:                          ; >726f
 * Pointer to data for PSG noise generator
 *
 * Points to #R$727D for tune. Changed (by #R$9CE3) to #R$72A5 for sound fx
-ptr_psg_noise_data:                    ; >7270
+;ptr_psg_noise_data:                    ; >7270
        data >0000
 
 * Pointer to data for PSG tone generator 1
 *
 * Points to #R$7287 for tune.
-ptr_psg_tone_1_data:                   ; >7272
+;ptr_psg_tone_1_data:                   ; >7272
        data >0000
 
 * Pointer to data for PSG tone generator 2
 *
 * Points to #R$7291 for tune.
-ptr_psg_tone_2_data:                   ; >7274
+;ptr_psg_tone_2_data:                   ; >7274
        data >0000
 
 * Pointer to data for PSG tone generator 3
 *
 * Points to #R$729B for tune.
-ptr_psg_tone_3_data:                   ; >7276
+;ptr_psg_tone_3_data:                   ; >7276
        data >0000
 
 * Last noise operation
-last_noise_operation:                  ; >7278
+;last_noise_operation:                  ; >7278
        byte >00,>00
 
 * Is a tune playing?
 *
 * Set to 5 when starting a tune, but any non-zero value could be used. Set to 0
 * when stopping a tune
-is_tune_playing:                       ; >727a
+;is_tune_playing:                       ; >727a
        byte >00
 
 * Sound player countdown (tune speed?)
 *
 * Counts down from 5 to zero, and certain sound player actions are only
 * performed when 0.
-sound_player_countdown:                ; >727b
+;sound_player_countdown:                ; >727b
        byte >00
 
 * Index of tune playing
-tune_index:                          ; >727c
+;tune_index:                          ; >727c
        byte >00
 
 * Tune data channel 1
@@ -479,19 +485,19 @@ tune_index:                          ; >727c
 * { $08 | Speed. Initialized to $05 }
 * { $09 | Countdown for relative loops }
 * TABLE#
-tune_data_buffer_1:                    ; >727d
+;tune_data_buffer_1:                    ; >727d
        byte >00,>00,>00,>00,>00,>00,>00,>00,>00,>00
 
 * Tune data channel 2
-tune_data_buffer_2:                    ; >7287
+;tune_data_buffer_2:                    ; >7287
        byte >00,>00,>00,>00,>00,>00,>00,>00,>00,>00
 
 * Tune data channel 3
-tune_data_buffer_3:                    ; >7291
+;tune_data_buffer_3:                    ; >7291
        byte >00,>00,>00,>00,>00,>00,>00,>00,>00,>00
 
 * Tune data channel 4
-tune_data_buffer_4:                    ; >729b
+;tune_data_buffer_4:                    ; >729b
        byte >00,>00,>00,>00,>00,>00,>00,>00,>00,>00
 
 * Sound fx data channel 1
@@ -508,35 +514,35 @@ tune_data_buffer_4:                    ; >729b
 * { $06 | Unknown, $00, $40, $80, $C0, $F0 }
 * { $07 | Unknown, $00, $01, $03 }
 * TABLE#
-sound_fx_data_buffer_1:                ; >72a5
+;sound_fx_data_buffer_1:                ; >72a5
        byte >00,>00,>00,>00,>00,>00,>00,>00
 
 * Sound fx data channel 2
-sound_fx_data_buffer_2:                ; >72ad
+;sound_fx_data_buffer_2:                ; >72ad
        byte >00,>00,>00,>00,>00,>00,>00,>00
 
 * Sound fx data channel 3
-sound_data_buffer_3:                   ; >72b5
+;sound_fx_data_buffer_3:                   ; >72b5
        byte >00,>00,>00,>00,>00,>00,>00,>00
 
 * Sound fx data channel 4
-sound_fx_data_buffer_4:                ; >72bd
+;sound_fx_data_buffer_4:                ; >72bd
        byte >00
 
 * Byte 1-2 of sound fx data 4
-sound_fx_data_buffer_4_12:             ; >72be
+;sound_fx_data_buffer_4_12:             ; >72be
        byte >00,>00
 
 * Byte 3-4 of sound fx data 4
-sound_fx_data_buffer_4_34:             ; >72c0
+;sound_fx_data_buffer_4_34:             ; >72c0
        byte >00,>00
 
 * Byte 5 of sound fx data 4
-sound_fx_data_buffer_4_5:              ; >72c2
+;sound_fx_data_buffer_4_5:              ; >72c2
        byte >00
 
 * Byte 6-7 of sound fx data 4
-sound_fx_data_buffer_4_67:             ; >72c3
+;sound_fx_data_buffer_4_67:             ; >72c3
        byte >00,>00
 
 * Temporary center of projection
