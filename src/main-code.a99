@@ -138,9 +138,9 @@ main_loop:                             ; >80e8
 *
 * Used by the routine at #R$80E8.
 died:                                  ; >8139
-       .call @stop_tune                ; CALL $9B87        ; Stop tune
+       bl   @stop_tune                ; CALL $9B87        ; Stop tune
        movb @bytes+>03,a               ; LD A,$03          ; Play explosion sound
-       .call @call_play_sound          ; CALL $9EA3        ; ...
+       bl   @call_play_sound           ; CALL $9EA3        ; ...
        li   hl,status_flags            ; LD HL,$71EB       ; Reset main loop flag
        szcb @bits+6,*hl                ; RES 6,(HL)        ; ...
 ;       .call @read_register            ; CALL $1FDC        ; READ_REGISTER
@@ -416,7 +416,7 @@ init_stage_10:                         ; >82c3
        movb @bytes+>06,b               ; LD B,$06          ; Set B = 6
 init_stage_11:                         ; >82f6
        movb b,a                        ; LD A,B            ; Set A = B
-       .call @call_play_tune           ; CALL $9E91        ; Play selected tune
+       bl   @call_play_tune           ; CALL $9E91        ; Play selected tune
        .call @display_lives            ; CALL $A6D2        ; Display lives
        .call @init_sprite_data         ; CALL $ACDF        ; Init sprite data
        .call @initial_game_loop        ; CALL $A33B        ; Initial game loop
@@ -474,18 +474,18 @@ stage_completed_loop:                     ; >833e
        .pop bc                         ; POP BC            ;
        sb   one,b                      ; DJNZ $833E        ; Loop for 90 frames
        jne  stage_completed_loop          ;
-       .call @stop_tune                ; CALL $9B87        ; Stop tune
+       bl    @stop_tune                ; CALL $9B87        ; Stop tune
        .call @clear_rows_9_and_14      ; CALL $84ED        ; Clear rows 9 and 14
        movb @stage,a                   ; LD A,($7200)      ; Stage
        andi a,>0300                    ; AND $03           ; Stage mod 4
        cb   a,@bytes+>02               ; CP $02            ; If not planet reached (2)
        jne  stage_completed_3          ; JR NZ,$8368       ; Then skip ahead
        movb one,a                      ; LD A,$01          ; Play tune 1
-       .call @call_play_tune           ; CALL $9E91        ; ...
+       bl   @call_play_tune           ; CALL $9E91        ; ...
        jmp  stage_completed_4          ; JR $836D          ;
 stage_completed_3:                     ; >8368
        movb @bytes+>05,a               ; LD A,$05          ; If not planet reached then play sound
-       .call @call_play_sound          ; CALL $9EA3        ; ...
+       bl   @call_play_sound           ; CALL $9EA3        ; ...
 stage_completed_4:                     ; >836d
        li   hl,status_flags            ; LD HL,$71EB       ;
        socb @bits+0,*hl                ; SET 0,(HL)        ; Set warp flag
@@ -635,7 +635,7 @@ display_hits:                          ; >8450
 * Used by the routine at #R$8429.
 perfect_bonus:                         ; >846b
        movb @bytes+>02,a               ; LD A,$02          ; Play a tune
-       .call @call_play_tune           ; CALL $9E91        ; ...
+       bl   @call_play_tune           ; CALL $9E91        ; ...
        li   hl,congratulations_msg     ; LD HL,$85B9       ; Display CONGRATULATIONS
        li   de,>1928                   ; LD DE,$1928       ; ...
        li   bc,>0010                   ; LD BC,$0010       ; ...
@@ -2175,7 +2175,7 @@ start_wave_in_a:                       ; >8c3e
 * Used by the routine at #R$8C30.
 start_new_wave:                        ; >8c52
        movb @bytes+>02,a               ; LD A,$02          ; Play a sound
-       .call @call_play_sound          ; CALL $9EA3        ; ...
+       bl   @call_play_sound           ; CALL $9EA3        ; ...
 * This entry point is used by the routine at #R$8C30.
 start_new_wave_1:                      ; >8c57
        a    bc,hl                      ; ADD HL,BC         ; Add offset to table base
@@ -2605,7 +2605,7 @@ create_mines_1:                        ; >8ec2
        movb @>05(iy),a                 ; LD A,(IY+$05)     ;
        movb a,@mines_time_left         ; LD ($7263),A      ;
        movb @bytes+>07,a               ; LD A,$07          ; Play sound
-       .call @call_play_sound          ; CALL $9EA3        ; ...
+       bl   @call_play_sound           ; CALL $9EA3        ; ...
        .ret                            ; RET               ;
 
 * Create mine
@@ -3519,7 +3519,7 @@ shot_hit_sprite_enemy:                 ; >9934
        movb @bytes+>04,a               ; LD A,$04          ; Sound = 4
 * This entry point is used by the routine at #R$9924.
 _9936:                                 ; >9936
-       .call @call_play_sound          ; CALL $9EA3        ; Play sound
+       bl   @call_play_sound           ; CALL $9EA3        ; Play sound
        .push ix                        ; PUSH IX           ; Save shot address
        .push iy                        ; PUSH IY           ; Save enemy address
        .pop ix                         ; POP IX            ; IX = enemy address
@@ -3591,7 +3591,7 @@ shot_hit_center_enemy:                 ; >99a0
        bl   @deallocate_map_entry     ; CALL $AAE3        ; Deallocate map entry
        .call @remove_shot              ; CALL $9A1C        ; Remove shot
        movb one,a                      ; LD A,$01          ; Play sound
-       .call @call_play_sound          ; CALL $9EA3        ; ...
+       bl   @call_play_sound           ; CALL $9EA3        ; ...
        li   de,>0100                   ; LD DE,$0100       ; Add points
        jmp  add_points_in_de           ; JR $9999          ; ...
 
@@ -3608,7 +3608,7 @@ shot_hit_mine:                         ; >99b1
        cb   a,@bytes+>80               ; CP $80            ; If not $80
        jne  _99d3                      ; JR NZ,$99D3       ; Then jump ahead
        movb @bytes+>08,a               ; LD A,$08          ; Play sound
-       .call @call_play_sound          ; CALL $9EA3        ; ...
+       bl   @call_play_sound           ; CALL $9EA3        ; ...
        movb @other_flags,a             ; LD A,($7256)      ; If double shot is enabled
        czc  @bit1,a                    ; BIT 1,A           ; ...
        jne  _99d3                      ; JR NZ,$99D3       ; Then skip offering double shot
@@ -3618,7 +3618,7 @@ shot_hit_mine:                         ; >99b1
        jmp  _99ea                      ; JR $99EA          ; Jump ahead
 _99d3:                                 ; >99d3
        movb @bytes+>04,a               ; LD A,$04          ; Play sound
-       .call @call_play_sound          ; CALL $9EA3        ; ...
+       bl   @call_play_sound           ; CALL $9EA3        ; ...
        li   hl,mines_destroyed         ; LD HL,$7254       ; Get mines destroyed
        movb *hl,a                      ; LD A,(HL)         ; ...
        ab   one,*hl                    ; INC (HL)          ; Increment mines destroyed
@@ -3901,7 +3901,7 @@ implosion_loop:                        ; >a36e
        .call @display_ship_bg_patterns ; CALL $A808        ; Display ship background patterns
        .call @upload_sprite_data       ; CALL $ACF9        ; Upload sprite data
        movb @bytes+>07,a               ; LD A,$07          ; Play a sound
-       .call @call_play_sound          ; CALL $9EA3        ; ...
+       bl   @call_play_sound           ; CALL $9EA3        ; ...
 * Game loop 60 times
        movb @bytes+>3c,b               ; LD B,$3C          ; 60
 stage_init_loop:                       ; >a3b6
@@ -4199,7 +4199,7 @@ add_score_4:                           ; >a71e
        movb a,@lives                   ; LD ($71FF),A      ; Save it
        .call @display_lives            ; CALL $A6D2        ; Display lives
        movb @bytes+>06,a               ; LD A,$06          ; Play a sound
-       .call @call_play_sound          ; CALL $9EA3        ; ...
+       bl   @call_play_sound           ; CALL $9EA3        ; ...
 add_score_5:                           ; >a739
        .pop bc                         ; POP BC            ;
        .pop de                         ; POP DE            ;

@@ -29,6 +29,7 @@ init_sound_1:                          ; >9afc
 *
 * I:A Index of tune (0 - 6)
 play_tune:                             ; >9b0d
+       .proc
        cb   a,@bytes+>07               ; CP $07            ; If tune index is 7
        jeq  play_tune_1                ; JR Z,$9B19        ; Then skip ahead
        movb a,@tune_index              ; LD ($727C),A      ; Else save tune index
@@ -73,7 +74,7 @@ play_tune_3:                           ; >9b54
 play_tune_4:                           ; >9b56
        b    @play_sound_fx_2           ; JP $9CB5          ; Play sound fx
 play_tune_5:
-       .ret
+       .endproc
 
 * Increase attenuation for all tune channels
 *
@@ -113,13 +114,13 @@ stop_tune:                             ; >9b87
        movb a,@tune_data_buffer_2      ; LD ($7287),A      ; Disable channel 2
        movb a,@tune_data_buffer_3      ; LD ($7291),A      ; Disable channel 3
        movb a,@tune_data_buffer_4      ; LD ($729B),A      ; Disable channel 4
-       .ret                            ; RET               ;
+       rt                              ; RET               ;
 
 * Sound player
 *
 * Used by the routine at #R$8522.
 sound_player:                          ; >9b99
-       .call @all_channels_data_to_psg ; CALL $A2BB        ; Send data for all channels to PSG
+       bl    @all_channels_data_to_psg ; CALL $A2BB        ; Send data for all channels to PSG
        .call @execute_sound_fx_commands ; CALL $9D67        ; Execute commands for all sound fx channels
        movb @is_tune_playing,a         ; LD A,($727A)      ; Is tune playing?
        ; AND A                         ; AND A             ; ...
@@ -180,7 +181,7 @@ sound_player_5:                        ; >9bd9
        jeq  sound_player_4             ; JR Z,$9BCA        ; If zero then jump back into #R$9B99
 sound_player_6:                        ; >9bf1
        ab   @bytes+>06,a               ; ADD A,$06         ; Add 6 to get tune index 6
-       .call @play_tune                ; CALL $9B0D        ; Play tune
+       bl   @play_tune                ; CALL $9B0D        ; Play tune
        jmp  sound_player_3             ; JR $9BAE          ;
 
 * Relative jump then  tune index >= 3
@@ -230,12 +231,12 @@ process_tune_byte_1:                   ; >9c27
        ; AND A                         ; AND A             ; Was the byte zero?
        movb *hl+,a                     ; Get tune byte (duration)
        jne  process_abs_rel_jump       ; JR NZ,$9C39       ; If not zero, then jump ahead
-       .call @stop_tune                ; CALL $9B87        ; Stop tune
+       bl   @stop_tune                ; CALL $9B87        ; Stop tune
        movb @tune_index,a              ; LD A,($727C)      ; Get tune index
        ; AND A                         ; AND A             ; Return if not zero
        jne  process_tune_byte_2        ; RET NZ            ; ...
        movb @bytes+>03,a               ; LD A,$03          ; Play tune #3
-       b    @play_tune                 ; JP $9B0D          ; ...
+       bl   @play_tune                 ; JP $9B0D          ; ...
 process_tune_byte_2:
        .ret                            ;
 
@@ -346,25 +347,30 @@ relative_jump_1:                       ; >9ca3
 *
 * I:C Index of sound FX (1-9), maybe 1 is no sound?
 play_sound_fx:                         ; >9ca8
+       .proc
        movb @tune_index,a              ; LD A,($727C)      ; Get tune playing
        ; AND A                         ; AND A             ; If zero
-       jeq  play_sound_fx_1            ; RET Z             ; Then return
+       jeq  play_sound_fx_3            ; RET Z             ; Then return
        cb   a,@bytes+>06               ; CP $06            ; Are we playing tune 6?
        jeq  play_sound_fx_2            ; JR Z,$9CB5        ; Then skip ahead
        movb @c,a                       ; LD A,C            ; A = index of sound FX
        cb   a,@bytes+>02               ; CP $02            ; Is it < 2?
-       jhe  play_sound_fx_2            ; RET C             ; Then return
-play_sound_fx_1:
-       .ret
+       jl   play_sound_fx_3            ; RET C             ; Then return
+       jmp  play_sound_fx_2
 * This entry point is used by the routines at #R$9B54 and #R$9E01.
+play_sound_fx_1:                       ; >9cb5
+       .proc
 play_sound_fx_2:                       ; >9cb5
        movb @c,a                       ; LD A,C            ; A = index of sound FX
        .push af                        ; PUSH AF           ; Save index
-       .call @init_sound_fx            ; CALL $9CBF        ; Call next routine
+       bl   @init_sound_fx             ; CALL $9CBF        ; Call next routine
        .pop af                         ; POP AF            ; Restore index
        cb   a,@bytes+>09               ; CP $09            ; Is it 9? (if called from play_tune or #R$9E45)
-       jne  play_sound_fx_1               ; RET NZ            ; Return if not
+       jne  play_sound_fx_3            ; RET NZ            ; Return if not
        ab   one,a                      ; INC A             ; Index + 1 (now 10) (continue into #R$9CBF)
+       bl   @init_sound_fx
+play_sound_fx_3:
+       .endproc
 
 * Copy data from #R$9CE7 to sound fx channel, and change pointer from sound
 * data to sound fx data
@@ -406,7 +412,7 @@ init_sound_fx:                    ; >9cbf
 ;       inc  hl                         ; INC HL            ; Next address
 ;       movb d,*hl                      ; LD (HL),D         ; Set pointer MSB
        mov  de,*hl                     ; Set pointer
-       .ret                            ; RET               ;
+       rt                              ; RET               ;
 
 * Sound fx done
 *
@@ -639,7 +645,7 @@ sound_fx_command_5_8_a:                ; >9e1f
        jne  current_sound_fx_done      ; JP NZ,$9DFC       ; Sound FX done
        movb @bytes+>09,@c              ; LD C,$09          ; Sound index
        .push bc                        ; PUSH BC           ;
-       .call @play_sound_fx_2          ; CALL $9CB5        ; Play sound 9
+       bl   @play_sound_fx_1          ; CALL $9CB5        ; Play sound 9
        .pop bc                         ; POP BC            ;
        jmp  sound_fx_command_5_8_c     ; RET               ;
 sound_fx_command_5_8_b:                ; >9e4a
@@ -705,18 +711,19 @@ sound_fx_command_9_b:
 *
 * Used by the routines at #R$82BF, #R$832A and #R$846B. I:A Index of tune
 call_play_tune:                        ; >9e91
+       .proc
        .push bc                        ; PUSH BC           ;
        .push de                        ; PUSH DE           ;
        .push hl                        ; PUSH HL           ;
        .push ix                        ; PUSH IX           ;
        .push iy                        ; PUSH IY           ;
-       .call @play_tune                ; CALL $9B0D        ; Play tune
+       bl   @play_tune                ; CALL $9B0D        ; Play tune
        .pop iy                         ; POP IY            ;
        .pop ix                         ; POP IX            ;
        .pop hl                         ; POP HL            ;
        .pop de                         ; POP DE            ;
        .pop bc                         ; POP BC            ;
-       .ret                            ; RET               ;
+       .endproc                            ; RET               ;
 
 * Call play sound, preserve registers
 *
@@ -725,39 +732,41 @@ call_play_tune:                        ; >9e91
 *
 * I:A Index of sound
 call_play_sound:                       ; >9ea3
+       .proc
        .push bc                        ; PUSH BC           ;
        .push de                        ; PUSH DE           ;
        .push hl                        ; PUSH HL           ;
        .push ix                        ; PUSH IX           ;
        .push iy                        ; PUSH IY           ;
        movb a,@c                       ; LD C,A            ;
-       .call @play_sound_fx               ; CALL $9CA8        ; Play sound
+       bl   @play_sound_fx            ; CALL $9CA8        ; Play sound
        .pop iy                         ; POP IY            ;
        .pop ix                         ; POP IX            ;
        .pop hl                         ; POP HL            ;
        .pop de                         ; POP DE            ;
        .pop bc                         ; POP BC            ;
-       .ret                            ; RET               ;
+       .endproc                        ; RET               ;
 
 * Send data for all channels to PSG
 *
 * Used by the routine at #R$9B99.
 all_channels_data_to_psg:              ; >a2bb
+       .proc
        movb @bytes+>9f,a               ; LD A,$9F          ; Mute channel 1
        movb @bytes+>90,@c              ; LD C,$90          ; Tone 1 attenuation
        movb @bytes+>80,d               ; LD D,$80          ; Tone 1 frequency
        mov  @ptr_psg_tone_1_data,ix    ; LD IX,($7272)     ; IX=#R$7287
-       .call @tone_data_to_psg         ; CALL $A314        ; Play tone or mute
+       bl   @tone_data_to_psg         ; CALL $A314        ; Play tone or mute
        movb @bytes+>bf,a               ; LD A,$BF          ; Mute channel 2
        movb @bytes+>b0,@c              ; LD C,$B0          ; Tone 2 attenuation
        movb @bytes+>a0,d               ; LD D,$A0          ; Tone 2 frequency
        mov  @ptr_psg_tone_2_data,ix    ; LD IX,($7274)     ; IX=#R$7291
-       .call @tone_data_to_psg         ; CALL $A314        ; Play tone or mute
+       bl   @tone_data_to_psg         ; CALL $A314        ; Play tone or mute
        movb @bytes+>df,a               ; LD A,$DF          ; Mute channel 3
        movb @bytes+>d0,@c              ; LD C,$D0          ; Tone 3 attenuation
        movb @bytes+>c0,d               ; LD D,$C0          ; Tone 3 frequency
        mov  @ptr_psg_tone_3_data,ix    ; LD IX,($7276)     ; IX=#R$729B
-       .call @tone_data_to_psg         ; CALL $A314        ; Play tone or mute
+       bl   @tone_data_to_psg         ; CALL $A314        ; Play tone or mute
        movb @b255,a                    ; LD A,$FF          ; Mute noise
        movb @bytes+>f0,@c              ; LD C,$F0          ; Noise attenuation
        mov  @ptr_psg_noise_data,ix     ; LD IX,($7270)     ; IX=#R$727D
@@ -765,7 +774,7 @@ all_channels_data_to_psg:              ; >a2bb
        ab   one,@e                     ; INC E             ; If it was zero
        jne  noise_data_to_psg          ; JR NZ,$A2F3       ; Then jump ahead
        .a_to_psg                       ; OUT ($FF),A       ; Else mute
-       .ret                            ; RET               ;
+       .endproc                        ; RET               ;
 
 * Send data for noise channel to PSG
 *
@@ -773,13 +782,13 @@ all_channels_data_to_psg:              ; >a2bb
 *
 * I:(IX+$04) Attenuation/noise control AAAAXNNN
 noise_data_to_psg:                     ; >a2f3
-       .call @attn_or_noise_to_psg     ; CALL $A303        ; Send attenuation to PSG
+       bl   @attn_or_noise_to_psg      ; CALL $A303        ; Send attenuation to PSG
        movb @>04(ix),a                 ; LD A,(IX+$04)     ; Get sound byte
        andi a,>0f00                    ; AND $0F           ; Isolate bits 0-3
        li   hl,last_noise_operation    ; LD HL,$7278       ; Compare to stored value
        cb   a,*hl                      ; CP (HL)           ; ...
        jne  !                          ; RET Z             ; Return if same
-       .ret                            ;
+       .endproc                        ;
 !
        movb a,*hl                      ; LD (HL),A         ; Else store new value
        movb @bytes+>e0,@c              ; LD C,$E0          ; and make noise (continue into #R$A303)
@@ -793,18 +802,18 @@ noise_data_to_psg:                     ; >a2f3
 attn_or_noise_to_psg:                  ; >a303
        movb @>04(ix),a                 ; LD A,(IX+$04)     ; Get sound byte
        czc  @bit4l,bc                  ; BIT 4,C           ; If bit 4 of operation is 0, i.e. noise control
-       jeq  _a30e                      ; JR Z,$A30E        ; Then skip shifting
+       jeq  attn_or_noise_to_psg_1     ; JR Z,$A30E        ; Then skip shifting
 ;       srl  a,1                        ; RRCA              ; Swap bits 4-7 and 0-3
 ;       srl  a,1                        ; RRCA              ; ...
 ;       srl  a,1                        ; RRCA              ; ...
 ;       srl  a,1                        ; RRCA              ; ...
        srl  a,4
-_a30e:                                 ; >a30e
+attn_or_noise_to_psg_1:                ; >a30e
        andi a,>0f00                    ; AND $0F           ; Isolate bits 0-3
        socb @c,a                       ; OR C              ; Apply operation (attenuation or noise control) to bits
                                                            ; 4-7
        .a_to_psg                       ; OUT ($FF),A       ; Send to PSG
-       .ret                            ; RET               ;
+       rt                              ; RET               ;
 
 * Send data for tone channel to PSG
 *
@@ -815,11 +824,12 @@ _a30e:                                 ; >a30e
 * I:D Tone operation for channel
 * I:(IX+$00): $00 for tone else mute
 tone_data_to_psg:                      ; >a314
+       .proc
        movb *ix,@e                     ; LD E,(IX+$00)     ; Get byte 0
        ab   one,@e                     ; INC E             ; If byte 0 was 0 then this is not 0
        jne  attn_and_freq_to_psg       ; JR NZ,$A31D       ; Jump for tone
        .a_to_psg                       ; OUT ($FF),A       ; Mute
-       .ret                            ; RET               ;
+       .endproc                        ; RET               ;
 
 * Send attenuation and frequency bytes to PSG
 *
@@ -831,7 +841,7 @@ tone_data_to_psg:                      ; >a314
 * I:(IX+$03) Frequency LSB
 * I:(IX+$04) Attenuation/frequency MSB (AAAA00FF)
 attn_and_freq_to_psg:                  ; >a31d
-       .call @attn_or_noise_to_psg     ; CALL $A303        ; Set attenuation
+       bl   @attn_or_noise_to_psg     ; CALL $A303        ; Set attenuation
        movb @>03(ix),a                 ; LD A,(IX+$03)     ; Frequency LSB
        andi a,>0f00                    ; AND $0F           ; Isolate bits 0-3 of frequency
        socb d,a                        ; OR D              ; Apply operation to bits 4-7
@@ -851,5 +861,5 @@ attn_and_freq_to_psg:                  ; >a31d
        srl  d,4                        ; 0000FFFF
        socb d,a                        ; 00FFFFFF
        .a_to_psg                       ; OUT ($FF),A       ; Send to PSG
-       .ret                            ; RET               ;
+       .endproc                        ; RET               ;
 
