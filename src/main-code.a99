@@ -4212,7 +4212,7 @@ add_score_5:                           ; >a739
 control_ship:                          ; >a73c
        movb @frame_counter,a           ; LD A,($71F2)      ; Get frame counter
        andi a,>0100                    ; AND $01           ; Test bit 0
-       jne  control_ship_5             ; RET NZ            ; Return every 2nd frame
+       jeq  control_ship_5             ; RET NZ            ; Return every 2nd frame (changed for better division of work)
 ;       mov  @countdown_to_wave,hl      ; LD HL,($71F0)     ; Controller: #R$71F1
        movb  @current_player,h
        sb   @l,@l                      ; LD L,$00          ; Segment 0
