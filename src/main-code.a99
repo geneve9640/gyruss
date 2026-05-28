@@ -109,7 +109,7 @@ main_loop:                             ; >80e8
        .call @process_sprites          ; CALL $85E6        ; Process sprites
 ;       bl   @read_register             ; CALL $1FDC        ; READ_REGISTER
        bl   @play_sound_if_int
-       .call @handle_collisions        ; CALL $9796        ; Handle collisions
+       bl   @handle_collisions        ; CALL $9796        ; Handle collisions
        bl   @create_or_display_mines   ; CALL $8E2D        ;
 ;       bl   @read_register             ; CALL $1FDC        ; READ_REGISTER
        bl   @play_sound_if_int
@@ -119,7 +119,7 @@ main_loop:                             ; >80e8
        bl   @play_sound_if_int
        bl   @create_laser_fence_or_meteor ; CALL $8D50        ; Create laser fence
        bl   @next_frame_upl_sprites    ; CALL $84B1        ; Upload sprites
-       .call @display_center_enemies   ; CALL $AB72        ; Display center enemies
+       bl   @display_center_enemies    ; CALL $AB72        ; Display center enemies
        movb @current_player,a          ; LD A,($71F1)      ; Current player
        bl   @display_score             ; CALL $A699        ; Display score
        movb @status_flags,a            ; LD A,($71EB)      ; Status flags
@@ -138,15 +138,15 @@ main_loop:                             ; >80e8
 *
 * Used by the routine at #R$80E8.
 died:                                  ; >8139
-       bl   @stop_tune                ; CALL $9B87        ; Stop tune
+       bl   @stop_tune                 ; CALL $9B87        ; Stop tune
        movb @bytes+>03,a               ; LD A,$03          ; Play explosion sound
        bl   @call_play_sound           ; CALL $9EA3        ; ...
        li   hl,status_flags            ; LD HL,$71EB       ; Reset main loop flag
        szcb @bits+6,*hl                ; RES 6,(HL)        ; ...
 ;       bl   @read_register             ; CALL $1FDC        ; READ_REGISTER
-       .call @reset_enemy_sprite_types ; CALL $8AE6        ; Update sprite types $0F - $11
-       .call @explode                  ; CALL $A3E1        ; Explosion
-died_1:                                 ; >814f
+       bl   @reset_enemy_sprite_types ; CALL $8AE6        ; Update sprite types $0F - $11
+       bl   @explode                   ; CALL $A3E1        ; Explosion
+died_1:                                ; >814f
        movb @active_enemies,a          ; LD A,($722C)      ; Get active enemies
 ;       socb a,a                        ; OR A              ;
        jne  died_2                     ; JR NZ,$815E       ; If any left then keep waiting
@@ -159,7 +159,7 @@ died_2:                                ; >815e
        bl   @display_stars             ; CALL $AFFF        ; Display stars
        .call @process_sprites          ; CALL $85E6        ; Process sprites
        bl   @create_or_display_mines   ; CALL $8E2D        ; Create or display mines
-       .call @display_center_enemies   ; CALL $AB72        ; Display center enemies
+       bl   @display_center_enemies    ; CALL $AB72        ; Display center enemies
        bl   @next_frame_upl_sprites    ; CALL $84B1        ; Upload sprites
        jmp  died_1                     ; JR $814F          ;
 
@@ -469,7 +469,7 @@ stage_completed_loop:                     ; >833e
        bl   @display_stars             ; CALL $AFFF        ; Display stars
        bl   @control_ship              ; CALL $A73C        ; Control ship
        .call @process_sprites          ; CALL $85E6        ; Process sprites
-       .call @display_center_enemies   ; CALL $AB72        ; Display center enemies
+       bl   @display_center_enemies    ; CALL $AB72        ; Display center enemies
        bl   @next_frame_upl_sprites    ; CALL $84B1        ; Upload sprites
        .pop bc                         ; POP BC            ;
        sb   one,b                      ; DJNZ $833E        ; Loop for 90 frames
@@ -500,7 +500,7 @@ stage_completed_4:                     ; >836d
 ;       srl  a,1                        ; SRL A             ; ...
        srl  a,2
        ab   one,a                      ; INC A             ; + 1
-       .call @display_planet           ; CALL $9175        ; Display planet A
+       bl   @display_planet            ; CALL $9175        ; Display planet A
        bl   @upload_sprite_data        ; CALL $ACF9        ; Upload sprite data
 * Warp
 warp_loop:                             ; >838a
@@ -567,7 +567,7 @@ next_stage_1:                          ; >83ec
 next_stage_2:                          ; >83ff
        sb   a,a                        ; XOR A             ; Reset death count
        movb a,@stage_death_count       ; LD ($7204),A      ; ...
-       .call @display_planet           ; CALL $9175        ; Undraw planet
+       bl   @display_planet            ; CALL $9175        ; Undraw planet
        li   hl,>201c                   ; LD HL,$201C       ; Set 4 colors to white/black
        li   de,>0004                   ; LD DE,$0004       ; ...
        movb @bytes+>f1,a               ; LD A,$F1          ; ...
@@ -661,7 +661,7 @@ bonus_score_loop:                      ; >8496
        bl   @display_stars             ; CALL $AFFF        ; Display stars
        bl   @control_ship              ; CALL $A73C        ; Control ship
        .call @process_sprites          ; CALL $85E6        ; Process sprites
-       .call @display_center_enemies   ; CALL $AB72        ; Display center enemies
+       bl   @display_center_enemies    ; CALL $AB72        ; Display center enemies
        bl   @next_frame_upl_sprites    ; CALL $84B1        ; Upload sprites
        .pop bc                         ; POP BC            ;
        sb   one,b                      ; DJNZ $8496        ; Loop 7 times
@@ -1283,7 +1283,7 @@ sprite_handler_0e_11:
        bl   @maybe_create_enemy_shot  ; CALL $8A76        ; Create enemy shot
        sb   one,@>01(ix)               ; DEC (IX+$01)      ; Decrement polar y
        movb @sprite_data+>0002,a       ; LD A,($7004)      ; Ship polar x
-       .call @move_towards_x           ; CALL $8AC0        ; Move towards x
+       bl   @move_towards_x           ; CALL $8AC0        ; Move towards x
        movb @bytes+>10,*ix             ; LD (IX+$00),$10   ; Set sprite type
        ab   one,@>05(ix)               ; INC (IX+$05)      ; Mark for pattern reload
 !      .ret                            ; RET               ; Return to #R$8A41
@@ -1323,7 +1323,8 @@ move_to_center_2:                      ; >87f5
        movb @e,a                       ; LD A,E            ; Get x from map
        cb   a,@>02(ix)                 ; CP (IX+$02)       ; Compare with polar x
        jeq  move_to_center_3           ; JR Z,$8801        ; If same, skip ahead
-       b    @move_towards_x            ; JP $8AC0          ; Else jump out to #R$8AC0
+       bl   @move_towards_x            ; JP $8AC0          ; Else jump out to #R$8AC0
+       jmp  move_to_center_5
 move_to_center_3:                      ; >8801
        movb @bytes+>0e,*ix             ; LD (IX+$00),$0E   ; Change sprite type to enemy
 * Move towards y
@@ -1445,7 +1446,7 @@ _8878:                                 ; >8878
 * This entry point is used by the routine at #R$88BE.
 _889c:                                 ; >889c
        movb @sprite_data+>0002,a       ; LD A,($7004)      ; Ship polar x
-       .call @move_towards_x           ; CALL $8AC0        ; Move towards x
+       bl   @move_towards_x           ; CALL $8AC0        ; Move towards x
        ab   one,b                      ; INC B             ;
        movb b,@>03(ix)                 ; LD (IX+$03),B     ; Set counter
        .ret                            ; RET               ; Return to #R$8A41
@@ -1494,7 +1495,7 @@ _88d4:                                 ; >88d4
        jeq  _88f3                      ; JR Z,$88F3        ; Then jump to next routine
        sb   one,@>01(ix)               ; DEC (IX+$01)      ; Decrement polar y
        movb @sprite_data+>0002,a       ; LD A,($7004)      ; Get ship polar x
-       .call @move_towards_x           ; CALL $8AC0        ; Move towards x
+       bl   @move_towards_x           ; CALL $8AC0        ; Move towards x
        movb @bytes+>10,*ix             ; LD (IX+$00),$10   ; Set sprite type
        ab   one,@>05(ix)               ; INC (IX+$05)      ; Mark for pattern reload
        movb @>01(ix),a                 ; LD A,(IX+$01)     ; Get polar y
@@ -1885,33 +1886,34 @@ move_towards_x_2:                      ; >8ad3
        movb a,*ix                      ; LD (IX+$00),A     ; Change sprite type
        ab   one,@>05(ix)               ; INC (IX+$05)      ; Mark for pattern reload
 move_towards_x_3:
-       .ret                            ; RET               ;
+       rt                              ; RET               ;
 
 * Reset enemy sprite types after dying
 *
 * Used by the routine at #R$8139.
 reset_enemy_sprite_types:              ; >8ae6
+       .proc
        li   ix,sprite_data             ; LD IX,$7002       ; Sprite data
        li   de,>000c                   ; LD DE,$000C       ; Size of each sprite
        movb @bytes+>20,b               ; LD B,$20          ; 32 sprites
-_8aef:                                 ; >8aef
+reset_enemy_sprite_types_1:            ; >8aef
        movb *ix,a                      ; LD A,(IX+$00)     ; Get type
        cb   a,@bytes+>0e               ; CP $0E            ; If < $0E then move on
-       jl   _8b0d                      ; JR C,$8B0D        ; ...
+       jl   reset_enemy_sprite_types_2 ; JR C,$8B0D        ; ...
        cb   a,@bytes+>12               ; CP $12            ; If >= $12 then move on
-       jhe  _8b0d                      ; JR NC,$8B0D       ; ...
+       jhe  reset_enemy_sprite_types_2 ; JR NC,$8B0D       ; ...
        movb @>07(ix),r0                ; BIT 6,(IX+$07)    ; For types $0E - $11 (enemies), test flag bit 6
        andi r0,>4000                   ;
-       jne  _8b0d                      ; JR NZ,$8B0D       ; If not set, move on
+       jne  reset_enemy_sprite_types_2 ; JR NZ,$8B0D       ; If not set, move on
        movb @bytes+>10,*ix             ; LD (IX+$00),$10   ; Set type to $10
        movb @bytes+>0c,@>07(ix)        ; LD (IX+$07),$0C   ; Set flags to $0C
        movb @b255,@>04(ix)             ; LD (IX+$04),$FF   ; Set loaded patten index to none
        bl   @load_sprite_pattern_fast  ; RST $30           ; Load sprite pattern
-_8b0d:                                 ; >8b0d
+reset_enemy_sprite_types_2:            ; >8b0d
        a    de,ix                      ; ADD IX,DE         ; Next sprite
        sb   one,b                      ; DJNZ $8AEF        ; Loop for 32 sprites
-       jne  _8aef                      ;
-       .ret                            ; RET               ;
+       jne  reset_enemy_sprite_types_1 ;
+       .endproc                        ; RET               ;
 
 * Draw background patterns for sprite
 *
@@ -2840,7 +2842,7 @@ logo_letter:                           ; >912a
        jne  logo_row                   ; JR NZ,$9128       ; Loop for 2 rows
        bl   @init_sprite_data          ; CALL $ACDF        ; Init sprites
        movb @bytes+>06,a               ; LD A,$06          ; Planet number
-       .call @display_planet           ; CALL $9175        ; Draw planet 6 (Earth)
+       bl   @display_planet            ; CALL $9175        ; Draw planet 6 (Earth)
        bl   @upload_sprite_data        ; CALL $ACF9        ; Upload sprite data
        bl   @clear_row_7               ; CALL $920D        ; Clear row 7
        li   hl,copyright_msg           ; LD HL,$92AC       ; Copyright message
@@ -2878,6 +2880,7 @@ logo_letter:                           ; >912a
 *
 * I:A Index of planet (1 based, 0 = undraw)
 display_planet:                        ; >9175
+       .proc
        ab   a,a                        ; ADD A,A           ; a *= 2
        jeq  erase_planet               ; JR Z,$91A1        ; If zero then undraw planet
        li   hl,planet_table-2          ; LD HL,$9396       ; Planet table minus 2: #R$9398-2
@@ -2887,10 +2890,10 @@ display_planet:                        ; >9175
 ;       movb *hl,d                      ; LD D,(HL)         ; Get MSB of planet data
        mov  *hl,de
        .ex_de_hl                       ; EX DE,HL          ; Address now in HL
-       .call @display_planet_name_table ; CALL $91B4        ; Draw to name table
-       .call @display_planet_name_and_sprites ; CALL $91CC        ;
+       bl   @display_planet_name_table ; CALL $91B4        ; Draw to name table
+       bl   @display_planet_name_and_sprites ; CALL $91CC        ;
        li   hl,>0400                   ; LD HL,$0400       ;
-       .call @copy_135_patterns        ; CALL $9285        ;
+       bl   @copy_planet_patterns     ; CALL $9285        ;
        li   hl,planet_colors           ; LD HL,$96EE       ; Planet colors
        li   de,>2010                   ; LD DE,$2010       ; Address in color table
        li   bc,>0010                   ; LD BC,$0010       ; 16 color sets
@@ -2899,7 +2902,7 @@ display_planet:                        ; >9175
        li   hl,planet_sprite_patterns  ; LD HL,$96FE       ; Sprite patterns
        li   bc,>0098                   ; LD BC,$0098       ; 19 patterns
        bl    @write_vram               ; RST $38           ; WRITE_VRAM
-       .ret                            ; RET               ;
+       .endproc                        ; RET               ;
 
 * Erase planet
 *
@@ -2912,27 +2915,31 @@ erase_planet:                          ; >91a1
        sb   *hl,*hl                    ; LD (HL),$00       ; ...
        .ldir                           ; LDIR              ; ...
        li   hl,buffer                  ; LD HL,$71A3       ; Use cleared bytes as planet data
+       jmp  display_planet_name_table_0
+
 * This entry point is used by the routine at #R$9175.
 display_planet_name_table:             ; >91b4
+       .proc
+display_planet_name_table_0:
        li   de,>194e                   ; LD DE,$194E       ; Address in name table
        movb @bytes+>04,@c              ; LD C,$04          ; 4 rows
-_91b9:                                 ; >91b9
+display_planet_name_table_1:           ; >91b9
        movb @bytes+>04,b               ; LD B,$04          ; 4 columns
-_91bb:                                 ; >91bb
+display_planet_name_table_2:           ; >91bb
        movb *hl,a                      ; LD A,(HL)         ; Get name to write
        bl   @vdp_write_byte            ; RST $10           ; Write VDP byte
        inc  de                         ; INC DE            ; Next destination
        inc  hl                         ; INC HL            ; Next source
        sb   one,b                      ; DJNZ $91BB        ; Loop for 4 columns
-       jne  _91bb                      ;
+       jne  display_planet_name_table_2                      ;
        .push hl                        ; PUSH HL           ; Save source
        li   hl,>001c                   ; LD HL,$001C       ; 32 - 4
        a    de,hl                      ; ADD HL,DE         ; One row down
        .ex_de_hl                       ; EX DE,HL          ; To DE
        .pop hl                         ; POP HL            ; Restore source
        sb   one,@c                     ; DEC C             ; Row counter
-       jne  _91b9                      ; JR NZ,$91B9       ; Loop for 4 rows
-       .ret                            ; RET               ;
+       jne  display_planet_name_table_1 ; JR NZ,$91B9       ; Loop for 4 rows
+       .endproc                        ; RET               ;
 
 * Display planet name and sprites
 *
@@ -2940,6 +2947,7 @@ _91bb:                                 ; >91bb
 *
 * I:HL Address of planet name prefixed by length
 display_planet_name_and_sprites:       ; >91cc
+       .proc
        .push hl                        ; PUSH HL           ; Save address
        bl   @clear_row_7               ; CALL $920D        ; clear_row_7 where the planet name is displayed
        movb @bytes+>20,a               ; LD A,$20          ; 32
@@ -2965,7 +2973,7 @@ display_planet_name_and_sprites:       ; >91cc
        ab   @bytes+>20,a               ; ADD A,$20         ; Add 32
        movb a,@e                       ; LD E,A            ; Store in E
        inc  hl                         ; INC HL            ; Next source byte
-_91ed:                                 ; >91ed
+display_planet_name_and_sprites_1:     ; >91ed
        bl   @allocate_sprite           ; RST $28           ; Allocate sprite
        sb   *ix,*ix                    ; LD (IX+$00),$00   ; Mark as allocated (set type)
        movb *hl,a                      ; LD A,(HL)         ; Get y
@@ -2980,12 +2988,12 @@ _91ed:                                 ; >91ed
        movb @c,@>0b(ix)                ; LD (IX+$0B),C     ; Set color
        movb d,r0                       ; BIT 7,D           ; If bit 7 of y is set
        andi r0,>8000                   ;
-       jne  _920a                      ; JR NZ,$920A       ; Then skip
+       jne  display_planet_name_and_sprites_2 ; JR NZ,$920A       ; Then skip
        ab   one,@e                     ; INC E             ; Else increment pattern
-_920a:                                 ; >920a
+display_planet_name_and_sprites_2:     ; >920a
        sb   one,b                      ; DJNZ $91ED        ; Loop to next sprite
-       jne  _91ed                      ;
-       .ret                            ; RET               ;
+       jne  display_planet_name_and_sprites_1 ;
+       .endproc                        ; RET               ;
 
 * Clear name table row 7
 *
@@ -3093,16 +3101,17 @@ read_B_bits_into_a_2:                  ; >9271
        jne  read_B_bits_into_a_1                      ;
        rt                              ; RET               ;
 
-* Copy 135 patterns
+* Copy planet patterns
 *
-* Copy 135 patterns from VDP RAM buffer into pattern table from 128 Used by the
+* Copy 135 patterns from VDP RAM buffer into pattern table from 128. Used by the
 * routine at #R$9175.
 *
 * I:HL Pattern generator table destination address ($0400)
-copy_135_patterns:                     ; >9285
+copy_planet_patterns:                  ; >9285
+       .proc
        li   de,>1400                   ; LD DE,$1400       ;
        movb @bytes+>0e,b               ; LD B,$0E          ; Counter
-_928a:                                 ; >928a
+copy_planet_patterns_1:                ; >928a
        .push bc                        ; PUSH BC           ;
        .push de                        ; PUSH DE           ;
        .push hl                        ; PUSH HL           ;
@@ -3123,8 +3132,8 @@ _928a:                                 ; >928a
        .ex_de_hl                       ; EX DE,HL          ; DE = $1448
        .pop bc                         ; POP BC            ;
        sb   one,b                      ; DJNZ $928A        ; Loop 15 times = 135 patterns
-       jne  _928a                      ;
-       .ret                            ; RET               ;
+       jne  copy_planet_patterns_1     ;
+       .endproc                        ; RET               ;
 
 * Parker Brothers copyright message
 copyright_msg:                         ; >92ac
@@ -3239,6 +3248,7 @@ earth:                                 ; >9454
 *
 * Used by the routine at #R$80E8.
 handle_collisions:                     ; >9796
+       .proc
        movb @allocated_sprites,a       ; LD A,($7182)      ; Allocated sprites
        sb   @bytes+>02,a               ; SUB $02           ; Return if only the ship sprites are allocated
        jeq  handle_collisions_5                          ; RET Z             ; ...
@@ -3319,7 +3329,7 @@ handle_collisions_3:                   ; >980b
        bl   @polar_x_distance          ; CALL $9A86        ; Polar x distance
        cb   a,@bytes+>07               ; CP $07            ; If < 7
        jhe  handle_collisions_4
-       .call @ship_hit_mine            ; CALL C,$9A75      ; Then call collision routine
+       bl   @ship_hit_mine            ; CALL C,$9A75      ; Then call collision routine
 handle_collisions_4:                   ; >9829
        a    de,iy                      ; ADD IY,DE         ; Next mine
        .pop bc                         ; POP BC            ; Restore counter
@@ -3337,7 +3347,7 @@ handle_collisions_5:                   ; >982e
        movb @b254,@>07(ix)             ; LD (IX+$07),$FE   ; Polar x velocity
        bl   @load_sprite_pattern_fast  ; RST $30           ; Load sprite pattern
 handle_collisions_6:
-       .ret                            ; RET               ;
+       .endproc                        ; RET               ;
 
 * Create double shot pickup sprite
 *
@@ -3442,11 +3452,9 @@ handle_shot_collision_5:               ; >98d1
        jhe  handle_shot_collision_6    ; JR NC,$98EB       ; Then move on to next
        movb @e,a                       ; LD A,E            ; Polar x
        cb   a,@>02(ix)                 ; CP (IX+$02)       ; Compare to polar x of shot
-       jne  !                          ; JP Z,$99A0        ; If equal we have a hit
+       jne  handle_shot_collision_6    ; JP Z,$99A0        ; If equal we have a hit
        b    @shot_hit_center_enemy     ;
-!
 handle_shot_collision_6:               ; >98eb
-       equ  $
        inc  hl                         ; INC HL            ; Next map address
        sb   one,b                      ; DJNZ $98D1        ; Loop for all map entries
        jne  handle_shot_collision_5    ;
@@ -3723,6 +3731,7 @@ ship_hit_enemy_2:                      ; >9a6d
 * I: IX Sprite data of ship
 * I: IY Mine data
 ship_hit_mine:                         ; >9a75
+       .proc
        movb @zero,@>04(iy)             ; LD (IY+$04),$00   ; Remove mine
        movb @zero,@>05(iy)             ; LD (IY+$05),$00   ; ...
        bl   @display_background_patterns ; CALL $8B12        ; Display background patterns
@@ -3872,7 +3881,7 @@ implosion_loop:                        ; >a36e
        bl   @control_ship              ; CALL $A73C        ; Control ship
        bl   @upload_sprite_data        ; CALL $ACF9        ; Upload sprite data
        bl   @display_stars             ; CALL $AFFF        ; Display stars
-       .call @display_center_enemies   ; CALL $AB72        ; Display center enemies
+       bl   @display_center_enemies    ; CALL $AB72        ; Display center enemies
        .pop bc                         ; POP BC            ; Restore counter
        sb   one,b                      ; DJNZ $A36E        ; Loop 20 times
        jne  implosion_loop             ;
@@ -3901,7 +3910,7 @@ stage_init_loop:                       ; >a3b6
        bl   @wait_int_play_sound
        bl   @display_stars             ; CALL $AFFF        ; Display stars
        bl   @control_ship              ; CALL $A73C        ; Control ship
-       .call @display_center_enemies   ; CALL $AB72        ; Display center enemies
+       bl   @display_center_enemies    ; CALL $AB72        ; Display center enemies
        bl   @next_frame_upl_sprites    ; CALL $84B1        ; Upload sprites
        .pop bc                         ; POP BC            ; Restore counter
        sb   one,b                      ; DJNZ $A3B6        ; Loop 60 times
@@ -3924,6 +3933,7 @@ initial_game_loop_1:
 *
 * Used by the routine at #R$8139.
 explode:                               ; >a3e1
+       .proc
        movb @bytes+>2a,a               ; LD A,$2A          ;
        movb a,@sprite_data+>0001       ; LD ($7003),A      ;
        bl   @display_ship_bg_patterns  ; CALL $A808        ; Display ship background patterns
@@ -3988,7 +3998,7 @@ explode_loop_2:                        ; >a459
        bl   @wait_int_play_sound
        bl   @display_stars             ; CALL $AFFF        ; Display stars
        .call @process_sprites          ; CALL $85E6        ; Process sprites
-       .call @display_center_enemies   ; CALL $AB72        ; Display center enemies
+       bl   @display_center_enemies    ; CALL $AB72        ; Display center enemies
        bl   @create_or_display_mines   ; CALL $8E2D        ;
        bl   @next_frame_upl_sprites    ; CALL $84B1        ; Upload sprites
        .pop bc                         ; POP BC            ;
@@ -3997,7 +4007,7 @@ explode_loop_2:                        ; >a459
        .pop bc                         ; POP BC            ;
        sb   one,b                      ; DJNZ $A450        ; Loop 20 times
        jne  explode_loop_1             ;
-       .ret                            ; RET               ;
+       .endproc                        ; RET               ;
 
 * Move explosion dots
 *
@@ -4627,11 +4637,11 @@ deallocate_sprite_from_map_4:
 * Used by the routines at #R$8024, #R$8139, #R$832A, #R$846B, #R$A33B and
 * #R$A3E1.
 display_center_enemies:                ; >ab72
+       .proc
        li   hl,update_counters_countdown ; LD HL,$72CB       ; Countdown for when to update counters
        sb   one,*hl                    ; DEC (HL)          ; -1
-       jlt  !                          ; JP P,$ABA0        ; If > 0, then don't update other counters
-       b    @display_center_enemies_2  ;
-!
+       jgt  display_center_enemies_2   ; JP P,$ABA0        ; If > 0, then don't update other counters
+       jeq  display_center_enemies_2  ;
        movb @bytes+>0f,*hl             ; LD (HL),$0F       ; Reset to 15
        movb @center_y_offset,a         ; LD A,($72D3)      ; Y offset
        li   hl,y_offset_direction      ; LD HL,$72D2       ; Add direction 1 or -1
@@ -4657,9 +4667,7 @@ display_center_enemies_1:              ; >ab9b
 display_center_enemies_2:              ; >aba0
        movb @center_enemy_processed,a  ; LD A,($72CD)      ; Get enemy to process
        cb   a,@bytes+>24               ; CP $24            ; If 36,
-       jne  !                          ; JP Z,$ABFF        ; Then jump to update name table
-       b    @display_center_enemies_names ;
-!
+       jeq  display_center_enemies_names ; JP Z,$ABFF        ; Then jump to update name table
 ;       socb a,a                        ; OR A              ; If 0 then erase all enemies
        movb a,a
        jne  display_center_enemies_3   ; JR NZ,$ABC4       ; Else jump ahead
@@ -4683,11 +4691,9 @@ display_center_enemies_3:              ; >abc4
        a    bc,hl                      ; ADD HL,BC         ; ...
        movb *hl,r0                     ; BIT 7,(HL)        ; If unallocated
        andi r0,>8000                   ;
-       jeq  !                          ; JP NZ,$ABFA       ; Then update counter and return
-       b    @display_center_enemies_5  ;
-!
-       bl   @polar_coord_from_map     ; CALL $AB38        ; Now DE contains polar y,x
-       bl   @polar_to_screen          ; CALL $B1C6        ; Convert polar to screen
+       jne  display_center_enemies_5   ; JP NZ,$ABFA       ; Then update counter and return
+       bl   @polar_coord_from_map      ; CALL $AB38        ; Now DE contains polar y,x
+       bl   @polar_to_screen           ; CALL $B1C6        ; Convert polar to screen
        .push de                        ; PUSH DE           ; Save screen coordinates
        movb *hl,a                      ; LD A,(HL)         ; Get map value
 ;       srl  a,1                        ; RRA               ; Isolate 3 bits
@@ -4726,9 +4732,7 @@ display_center_enemies_names:          ; >abff
        li   hl,center_enemies_redraw   ; LD HL,$72CC       ; Test flag
        movb *hl,r0                     ; BIT 0,(HL)        ; If not set
        andi r0,>0100                   ;
-       jne  !                          ; RET Z             ; Then return
-       .ret                            ;
-!
+       jeq  display_center_enemies_names_2 ; RET Z             ; Then return
        szcb @bits+0,*hl                ; RES 0,(HL)        ; Else reset flag
        movb @center_map_entries,a      ; LD A,($722B)      ; Get number of map entries
 ;       socb a,a                        ; OR A              ; Skip ahead if zero
@@ -4770,7 +4774,8 @@ display_center_enemies_names_1:         ; >ac15
        mov  hl,@center_enemies_name_1  ; LD ($72CE),HL     ; ...
        sb   a,a                        ; XOR A             ; Reset center enemy to process
        movb a,@center_enemy_processed  ; LD ($72CD),A      ; ...
-       .ret                            ; RET               ;
+display_center_enemies_names_2:
+       .endproc                        ; RET               ;
 
 * Erase center enemies,
 *
@@ -4800,7 +4805,7 @@ erase_center_enemies_1:                ; >ac38
 ;       sb   one,@c                     ; DEC C             ; Row counter
        dec  bc
        jne  erase_center_enemies_1     ; JR NZ,$AC38       ; Lopp for 4 rows
-       .ret                            ; RET               ;
+       .endproc                        ; RET               ;
 
 * Plot pixel
 *
@@ -5628,52 +5633,51 @@ display_star_frame_5:
 * O:E Screen x
 * O:Carry flag set if out of screen
 polar_to_screen:                       ; >b1c6
-       clr  @carry
-       movb @bytes+>0b,a               ; LD A,$0B          ; 11
-       ab   d,a                        ; ADD A,D           ; Polar y + 11
+       clr  r1
+       movb @bytes+>0b,r1              ; LD A,$0B          ; 11
+       ab   d,r1                       ; ADD A,D           ; Polar y + 11
        jlt  polar_to_screen_5          ; JP M,$B217        ; If this is 128 or more (polar y > 116 or polar y <
                                                            ; -11), then set position outside screen and return
-       movb a,@r1lb                    ; LD L,A            ; Calculate table address, with polar y = -11
+
+;       movb a,@r1lb                    ; LD L,A            ; Calculate table address, with polar y = -11
                                                            ; corresponding to row 0
-       sb   r1,r1                        ; LD H,$00          ; and polar y = 0 corresponding to row 11
+;       sb   r1,r1                        ; LD H,$00          ; and polar y = 0 corresponding to row 11
+       swpb r1
 ;       a    hl,hl                      ; ADD HL,HL         ; (y + 11) * 32
 ;       a    hl,hl                      ; ADD HL,HL         ; ...
 ;       a    hl,hl                      ; ADD HL,HL         ; ...
 ;       a    hl,hl                      ; ADD HL,HL         ; ...
 ;       a    hl,hl                      ; ADD HL,HL         ; ...
        sla  r1,5
-       movb @e,a                       ; LD A,E            ; x
-       czc  @bit4,a                    ; BIT 4,E           ; Is bit 4 set (top left or lower right quadrants)?
+       mov  de,af                      ; LD A,E            ; Polar x
+       czc  @bit4l,af                  ; BIT 4,E           ; Is bit value 16 set (top left or lower right quadrants)?
        jeq  polar_to_screen_1          ; JR Z,$B1DE        ; Jump if not
-       inv  a                          ; CPL               ; Else invert (0 -> 15, 1 -> 14, etc.)
+       inv  af                         ; CPL               ; Else invert (0 -> 15, 1 -> 14, etc.)
 polar_to_screen_1:                     ; >b1de
-       andi a,>0f00                    ; AND $0F           ; Use the first 4 inverted bits
-       ab   a,a                        ; ADD A,A           ; x2 (2 bytes per x)
+       andi af,>000f                   ; AND $0F           ; Use the first 4 (inverted) bits
+       a    af,af                      ; ADD A,A           ; x2 (2 bytes per x)
 ;       ab   @l,a                       ; ADD A,L           ; Add to address
 ;       movb a,@l                       ; LD L,A            ; ...
 ;       jnc  _b1e6                      ; JR NC,$B1E6       ; ...
 ;       ab   one,h                      ; INC H             ; ...
 ;_b1e6:                                 ; >b1e6
-       swpb a
-       a    a,r1
+       a    af,r1
 ;       li   bc,polar_to_screen_table   ; LD BC,$B21D       ; Lookup table base address
 ;       a    bc,hl                      ; ADD HL,BC         ; Add to address
        ai   r1,polar_to_screen_table
        movb *r1,a                      ; LD A,(HL)         ; Get table value
-       cb   a,@b255                    ; CP $FF            ; If $FF
-       jeq  polar_to_screen_5          ; JR Z,$B217        ; Then set position outside screen and return
+;      cb   a,@b255                    ; CP $FF            ; If $FF
+       jlt  polar_to_screen_5          ; JR Z,$B217        ; Then set position outside screen and return
 ;      li   ix,center_of_projection    ; LD IX,$7000       ; Center of projection
-       movb @e,a                       ; LD A,E            ; x
-       movb a,r0
-       srl  a,1                        ; RRCA              ; Shift right
-       ; XOR E                         ; XOR E             ; Bit 4 is now set if bit 5 (left/right) and bit 4 (top
-       xor  r0,a                                           ; left/lower right) were different, i.e. top of screen
-       movb a,r0                       ; BIT 4,A           ; Test bit 4 (top of screen)
+       mov  de,r0                      ; LD A,E            ; x
+       srl  r0,1                       ; RRCA              ; Shift right
+       xor  de,r0                      ; XOR E             ; Bit 4 is now set if bit 5 (left/right) and bit 4 (top
+                                                           ; left/lower right) were different, i.e. top of screen
+;      movb af,r0                      ; BIT 4,A           ; Test bit 4 (top of screen)
        clr  af
        movb *r1+,a                     ; LD A,(HL)         ; Get table value
-       czc  @bit4,r0
+       czc  @bit4l,r0                                      ; Test bit 4 (top of screen)
        jeq  polar_to_screen_2          ; JR Z,$B1FD        ; Skip negating if not top of screen
-;       andi af,>ff00
        neg a                           ; NEG               ; -table value
 polar_to_screen_2:                     ; >b1fd
 ;      ab   @>01(ix),a                 ; ADD A,(IX+$00)    ; +center y ($60) (changed since high endian)
@@ -5691,13 +5695,12 @@ polar_to_screen_3:                     ; >b20b
        ab   @center_of_projection,a
        sb   @bytes+>04,a               ; SUB $04           ; -4 (adjust for sprite size)
        movb a,@e                       ; LD E,A            ; Store as sprite x
-;       socb a,a                        ; OR A              ; Clear carry flag
-       jmp  polar_to_screen_4          ; JR $B212          ; To return
+       clr  @carry                     ; OR A              ; Clear carry flag
+       rt                              ; JR $B212          ; To return
 polar_to_screen_5:                     ; >b217
        li   de,>f500                   ; LD DE,$F500       ; Set return position outside screen
        seto @carry                     ; SCF               ; Set carry flag
-polar_to_screen_4:                      ; >b212
-       rt                            ; RET               ; ...
+       rt                              ; RET               ; ...
 
 ;* Random number generator (RST $20)
 ;*
