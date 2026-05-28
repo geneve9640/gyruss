@@ -800,7 +800,7 @@ play_sound_if_int:
        rt
 play_sound_if_int_1:
        .proc
-       .call @sound_player
+       bl   @sound_player
        .endproc
 
 wait_int_play_sound:
@@ -809,7 +809,7 @@ wait_int_play_sound:
        jmp  wait_int_play_sound
 wait_int_play_sound_1:
        .proc
-       .call @sound_player
+       bl   @sound_player
        .endproc
 
 * STAGE message

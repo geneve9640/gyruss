@@ -16,23 +16,23 @@ mode_1:
 * Sprite attribute table
        li   a,>0000
        li   hl,>1b00
-       .call @init_table
+       bl   @init_table
 * Sprite generator table
        li   a,>0100
        li   hl,>3800
-       .call @init_table
+       bl   @init_table
 * Pattern name table
        li   a,>0200
        li   hl,>1800
-       .call @init_table
+       bl   @init_table
 * Pattern generator table
        li   a,>0300
        li   hl,>0000
-       .call @init_table
+       bl   @init_table
 * Pattern color table
        li   a,>0400
        li   hl,>2000
-       .call @init_table
+       bl   @init_table
        .endproc
 
 init_table:
