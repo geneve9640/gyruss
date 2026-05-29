@@ -1,8 +1,15 @@
 * Init data for wave sprites
 *
 * Data for 24 waves, 4 bytes each
+* #TABLE(default, default)
+* { =h Byte | =h Purpose }
+* { $00 | Polar x for even enemies }
+* { $01 | Polar x for odd enemies }
+* { $02 | Bits 0-4 are the index into the table at #R$A581, which contains the address of the path data; bits 4-7 are ? }
+* { $03 | Bits 0-3 are the index into the table at #R$A57E, which determines the start polar y; bits 4-7 are the color of the sprites }
+* TABLE#
 wave_init_data:                        ; >a4be
-       byte >A8,>18,>80,>50
+       byte >A8,>18,>83,>50
        byte >A0,>10,>80,>E0
        byte >B0,>20,>80,>A0
        byte >88,>38,>80,>80
