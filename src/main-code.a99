@@ -3142,6 +3142,7 @@ copy_planet_patterns_1:                ; >928a
 * Parker Brothers copyright message
 copyright_msg:                         ; >92ac
        text >1d,' 1984  PARKER BROTHERS'
+       text 'TI-99/4A VERSION BY RASMUS MOUSTGAARD 2026'
 
 * Colors
 colors:                                ; >92c3
