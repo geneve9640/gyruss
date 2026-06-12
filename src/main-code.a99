@@ -16,6 +16,7 @@ entry:                                 ; >8024
        mov  hl,@screensaver_countdown  ; LD ($7257),HL     ; Set screensaver countdown
 entry_wait_fire:                       ; >8047
        bl   @ti_wait_vsync             ; HALT              ; Wait for interrupt
+       bl   @ti_check_quit
        bl   @display_stars             ; CALL $AFFF        ; Display stars
        li   hl,>0000                   ; LD HL,$0000       ; Controller 0, segment 0
        bl   @decoder                   ; CALL $1F79        ; DECODER
@@ -104,6 +105,7 @@ main_loop:                             ; >80e8
 ;       szcb @bits+0,*hl                ; RES 0,(HL)        ; Clear flag
 ;       bl   @read_register             ; CALL $1FDC        ; READ_REGISTER (read VDP status)
        bl   @wait_int_play_sound
+       bl   @ti_check_pause
        bl   @display_stars             ; CALL $AFFF        ; Display stars
        bl   @control_ship              ; CALL $A73C        ; Control ship
        bl   @process_sprites           ; CALL $85E6        ; Process sprites
@@ -154,7 +156,7 @@ died_1:                                ; >814f
        cb   a,*hl                      ; CP (HL)           ; ...
        jeq  lose_life                  ; JR Z,$8170        ; When all are centered then jump to lose life
 died_2:                                ; >815e
-        bl   @wait_int_play_sound
+       bl   @wait_int_play_sound
        bl   @display_stars             ; CALL $AFFF        ; Display stars
        bl   @process_sprites           ; CALL $85E6        ; Process sprites
        bl   @create_or_display_mines   ; CALL $8E2D        ; Create or display mines
@@ -184,7 +186,7 @@ lose_life:                             ; >8170
        sb   b,b                        ; LD B,$00          ; Stars for 256 frames
 game_over_loop:                        ; >8192
        .push bc                        ; PUSH BC           ; ...
-        bl   @wait_int_play_sound
+       bl   @wait_int_play_sound
        bl   @display_stars             ; CALL $AFFF        ; Display stars
        .pop bc                         ; POP BC            ; ...
        sb   one,b                      ; DJNZ $8192        ; ...
@@ -249,7 +251,7 @@ wait_for_restart:                      ; >81ed
        li   hl,>4650                   ; LD HL,$4650       ; 300 seconds
        mov  hl,@screensaver_countdown  ; LD ($7257),HL     ; Set screensaver countdown
 wait_for_restart_loop:                 ; >81f3
-        bl   @wait_int_play_sound
+       bl   @wait_int_play_sound
 ;       li   hl,>0001                   ; LD HL,$0001       ; Controller 0, segment 1
 ;       bl   @decoder                   ; CALL $1F79        ; DECODER
 ;       movb @l,a                       ; LD A,L            ;
@@ -464,7 +466,7 @@ stage_completed_1:                     ; >833c
        movb @bytes+>5a,b               ; LD B,$5A          ; 90
 stage_completed_loop:                     ; >833e
        .push bc                        ; PUSH BC           ;
-        bl   @wait_int_play_sound
+       bl   @wait_int_play_sound
        bl   @display_stars             ; CALL $AFFF        ; Display stars
        bl   @control_ship              ; CALL $A73C        ; Control ship
        bl   @process_sprites           ; CALL $85E6        ; Process sprites
@@ -503,7 +505,7 @@ stage_completed_4:                     ; >836d
        bl   @upload_sprite_data        ; CALL $ACF9        ; Upload sprite data
 * Warp
 warp_loop:                             ; >838a
-        bl   @wait_int_play_sound
+       bl   @wait_int_play_sound
        bl   @display_stars             ; CALL $AFFF        ; Display stars
        bl   @control_ship              ; CALL $A73C        ; Control ship
        bl   @process_sprites           ; CALL $85E6        ; Process sprites
@@ -656,7 +658,7 @@ display_bonus_score_1:                 ; >8489
        movb @bytes+>07,b               ; LD B,$07          ; 7 frames
 bonus_score_loop:                      ; >8496
        .push bc                        ; PUSH BC           ;
-        bl   @wait_int_play_sound
+       bl   @wait_int_play_sound
        bl   @display_stars             ; CALL $AFFF        ; Display stars
        bl   @control_ship              ; CALL $A73C        ; Control ship
        bl   @process_sprites           ; CALL $85E6        ; Process sprites
@@ -800,6 +802,7 @@ play_sound_if_int:
 play_sound_if_int_1:
        .proc
        bl   @sound_player
+       bl   @ti_check_quit
        .endproc
 
 wait_int_play_sound:
@@ -809,6 +812,7 @@ wait_int_play_sound:
 wait_int_play_sound_1:
        .proc
        bl   @sound_player
+       bl   @ti_check_quit
        .endproc
 
 * STAGE message
@@ -1074,7 +1078,7 @@ sprite_handler_04_0c:
 !
        movb a,*ix                      ; LD (IX+$00),A     ; Set new type
        movb @bytes+>3c,@>03(ix)        ; LD (IX+$03),$3C   ; Counter
-       sb   @>06(ix),@>06(ix)          ; LD (IX+$06),$00   ; No replacement type
+       movb @zero,@>06(ix)             ; LD (IX+$06),$00   ; No replacement type
        movb @bytes+>0f,@>0b(ix)        ; LD (IX+$0B),$0F   ; Set color
        movb @b255,@>04(ix)             ; LD (IX+$04),$FF   ; Set loaded patten index to none
        bl   @load_sprite_pattern_fast  ; RST $30           ; Load sprite pattern
@@ -1248,7 +1252,7 @@ sprite_handler_15_17_4:
 ;!
 * Sprite type $0E - $11 (enemies)
 sprite_handler_0e_11:
-       movb @>07(ix),r0                ; BIT 7,(IX+$07)    ; Check bit 7 to see if a path address is set
+       mov  @>06(ix),r0                ; BIT 7,(IX+$07)    ; Check bit 7 to see if a path address is set
        andi r0,>8000                   ;
        jeq  !                          ; JP NZ,$88FE       ; If set, update sprite path
        b    @update_sprite_path        ;
@@ -1258,15 +1262,15 @@ sprite_handler_0e_11:
        jeq  !                          ; JP NZ,$8825       ; If set, move towards viewer
        b    @move_towards_viewer       ;
 !
-       movb @>07(ix),r0                ; BIT 6,(IX+$07)    ; Check bit 6 of flags
+       movb @>06(ix),r0                ; BIT 6,(IX+$07)    ; Check bit 6 of flags
        andi r0,>4000                   ;
        jne  move_to_center             ; JR NZ,$87D5       ; If set, create map entry for enemy sprite
-       movb @>07(ix),r0                ; BIT 2,(IX+$07)    ; Check bit 2 of flags
+       movb @>06(ix),r0                ; BIT 2,(IX+$07)    ; Check bit 2 of flags
        andi r0,>0400                   ;
        jeq  !                          ; JP NZ,$8825       ; If set, move towards viewer
        b    @move_towards_viewer       ;
 !
-       movb @>07(ix),r0                ; BIT 0,(IX+$07)    ; Check bit 0 of flags
+       movb @>06(ix),r0                ; BIT 0,(IX+$07)    ; Check bit 0 of flags
        andi r0,>0100                   ;
        jeq  !                          ; JP NZ,$885F       ; If set, create enemy shot and move
        b    @create_enemy_shot_and_move ;
@@ -1372,17 +1376,17 @@ move_towards_viewer:                   ; >8825
 *
 * I:IX Sprite data of enemy
 handle_out_of_screen:                  ; >8835
-       movb @>07(ix),r0                ; BIT 3,(IX+$07)    ; If a flag is reset
+       movb @>06(ix),r0                ; BIT 3,(IX+$07)    ; If a flag is reset
        andi r0,>0800                   ;
        jeq  handle_out_of_screen_2     ; JR Z,$8848        ; Then skip ahead and determine what to do
 * This entry point is used by the routine at #R$8848.
 handle_out_of_screen_1:                ; >883b
        movb @bytes+>2a,@>01(ix)        ; LD (IX+$01),$2A   ; Reset polar y back to center
        movb @zero,@>02(ix)             ; LD (IX+$02),$00   ; Reset polar x
-       movb @bytes+>40,@>07(ix)        ; LD (IX+$07),$40   ; Set flags
+       movb @bytes+>40,@>06(ix)        ; LD (IX+$07),$40   ; Set flags
        .endproc                        ; RET               ; Return to #R$8A41
 handle_out_of_screen_2:                ; >8848
-       movb @>07(ix),r0                ; BIT 4,(IX+$07)    ; Test flag
+       movb @>06(ix),r0                ; BIT 4,(IX+$07)    ; Test flag
        andi r0,>1000                   ;
        jeq  handle_out_of_screen_3     ; JR Z,$8853        ; If not set, skip ahead
        bl   @ti_rnd                    ; RST $20           ; Random number
@@ -1477,7 +1481,7 @@ enemy_movement_2:                      ; >88be
        jne  enemy_movement_4           ; JR NZ,$88D4       ; If > $40 then jump ahead
 * This entry point is used by the routine at #R$8878.
 enemy_movement_3:                      ; >88cf
-       movb @bytes+>10,@>07(ix)        ; LD (IX+$07),$10   ; Set flags
+       movb @bytes+>10,@>06(ix)        ; LD (IX+$07),$10   ; Set flags
        .endproc                        ; RET               ; Return to #R$8A41
 
 * Enemy movement: Counter is >(=) $40
@@ -1618,7 +1622,7 @@ set_sprite_flags_to_18_if_match:       ; >8986
        andi a,>0f00                    ; AND $0F           ; Isolate sprite position in wave
        cb   a,*hl                      ; CP (HL)           ; Compare with path byte
        jne  update_sprite_path_2       ; JR NZ,$8916       ; If different, then jump back to #R$88FE
-       movb @bytes+>18,@>07(ix)        ; LD (IX+$07),$18   ; Set flags
+       movb @bytes+>18,@>06(ix)        ; LD (IX+$07),$18   ; Set flags
        .endproc                        ; RET               ; Return to #R$8A41
 
 * Enemy movement: Set sprite flags to $04
@@ -1628,7 +1632,7 @@ set_sprite_flags_to_18_if_match:       ; >8986
 * I:IX Sprite data
 * I:HL Path address
 set_sprite_flags_to_04:                ; >8994
-       movb @bytes+>04,@>07(ix)        ; LD (IX+$07),$04   ; Set flags
+       movb @bytes+>04,@>06(ix)        ; LD (IX+$07),$04   ; Set flags
        .endproc                        ; RET               ; Return to #R$8A41
 
 * Enemy movement: Set sprite flags to $40
@@ -1638,7 +1642,7 @@ set_sprite_flags_to_04:                ; >8994
 * I:IX Sprite data
 * I:HL Path address
 set_sprite_flags_to_40:                ; >8999
-       movb @bytes+>40,@>07(ix)        ; LD (IX+$07),$40   ; Set flags
+       movb @bytes+>40,@>06(ix)        ; LD (IX+$07),$40   ; Set flags
        .endproc                        ; RET               ; Return to #R$8A41
 
 * Handle sprite types $18 - $1C
@@ -1667,7 +1671,7 @@ sprite_handler_1a_1c_1:                ; >89b5
        movb a,*ix                      ; LD (IX+$00),A     ; This means rotate between $1A, $1B, and $1C
 * Sprite types $18 - $19 (three spheres, star shape) plus $1A - 1C
 sprite_handler_18_19:                  ; >89b8
-       movb @>07(ix),r0                ; BIT 7,(IX+$07)    ; Text flag bit 7
+       mov  @>06(ix),r0                ; BIT 7,(IX+$07)    ; Check bit 7 to see if a path address is set
        andi r0,>8000                   ;
        jeq  circular_enemy_movement_1                      ; JR Z,$8A2D        ; If reset, move towards viewer
        movb @sprite_countdown,a        ; LD A,($71EE)      ; Return if countdown
@@ -1765,7 +1769,7 @@ circular_enemy_movement_1:             ; >8a2d
 *
 * Used by the routine at #R$899E.
 circular_enemy_movement_2:             ; >8a3c
-       movb @bytes+>04,@>07(ix)        ; LD (IX+$07),$04   ; Set flags
+       movb @bytes+>04,@>06(ix)        ; LD (IX+$07),$04   ; Set flags
        .endproc                        ; RET               ; Return to #R$8A41
 
 * Return from sprite handler
@@ -1900,11 +1904,11 @@ reset_enemy_sprite_types_1:            ; >8aef
        jl   reset_enemy_sprite_types_2 ; JR C,$8B0D        ; ...
        cb   a,@bytes+>12               ; CP $12            ; If >= $12 then move on
        jhe  reset_enemy_sprite_types_2 ; JR NC,$8B0D       ; ...
-       movb @>07(ix),r0                ; BIT 6,(IX+$07)    ; For types $0E - $11 (enemies), test flag bit 6
+       movb @>06(ix),r0                ; BIT 6,(IX+$07)    ; For types $0E - $11 (enemies), test flag bit 6
        andi r0,>4000                   ;
        jne  reset_enemy_sprite_types_2 ; JR NZ,$8B0D       ; If not set, move on
        movb @bytes+>10,*ix             ; LD (IX+$00),$10   ; Set type to $10
-       movb @bytes+>0c,@>07(ix)        ; LD (IX+$07),$0C   ; Set flags to $0C
+       movb @bytes+>0c,@>06(ix)        ; LD (IX+$07),$0C   ; Set flags to $0C
        movb @b255,@>04(ix)             ; LD (IX+$04),$FF   ; Set loaded patten index to none
        bl   @load_sprite_pattern_fast  ; RST $30           ; Load sprite pattern
 reset_enemy_sprite_types_2:            ; >8b0d
@@ -3289,7 +3293,7 @@ handle_collisions_1:                   ; >97a4
        movb @status_flags,a            ; LD A,($71EB)      ; Is it chance stage?
        czc  @bit3,a                    ; BIT 3,A           ; ...
        jne  handle_collisions_2        ; JR NZ,$97F3       ; Then move to next sprite
-       movb @>07(ix),r0                ; BIT 7,(IX+$07)    ; If the flag bit 7 set in sprite data
+       movb @>06(ix),r0                ; BIT 7,(IX+$07)    ; If the flag bit 7 set in sprite data
        jlt  handle_collisions_2        ; JR NZ,$97F3       ; Then move to next sprite
        li   iy,sprite_data             ; LD IY,$7002       ; Ship sprite data
 ;       movb @>01(ix),a                 ; LD A,(IX+$01)     ; Is polar x = ship x?
@@ -3877,7 +3881,7 @@ display_implosion:                     ; >a34c
        movb @bytes+>14,b               ; LD B,$14          ; 20
 implosion_loop:                        ; >a36e
        .push bc                        ; PUSH BC           ; Save counter
-        bl   @wait_int_play_sound
+       bl   @wait_int_play_sound
        bl   @move_dots                 ; CALL $A471        ; Move dots
        bl   @control_ship              ; CALL $A73C        ; Control ship
        bl   @upload_sprite_data        ; CALL $ACF9        ; Upload sprite data
@@ -4561,7 +4565,7 @@ create_sprite_from_map_entry_2:        ; >ab17
        movb @bytes+>10,*ix             ; LD (IX+$00),$10   ; Set sprite type
        .pop af                         ; POP AF            ; Restore value from map
        movb a,@>0b(ix)                 ; LD (IX+$0B),A     ; Use it as color (maybe temporary since it's >= $80?)
-       socb @bits+0,@>07(ix)           ; SET 0,(IX+$07)    ; Set flag
+       socb @bits+0,@>06(ix)           ; SET 0,(IX+$07)    ; Set flag
        bl   @load_sprite_pattern_fast  ; RST $30           ; Load sprite pattern
 ;       li   hl,active_enemies          ; LD HL,$722C       ; Increment number of active enemies
 ;       ab   one,*hl                    ; INC (HL)          ; ...
@@ -4606,7 +4610,7 @@ polar_coord_from_map:                  ; >ab38
 * I: IX sprite data
 deallocate_sprite_from_map:            ; >ab53
        .proc
-       movb @>07(ix),r0                ; BIT 6,(IX+$07)    ; Test bit
+       movb @>06(ix),r0                ; BIT 6,(IX+$07)    ; Test bit
        andi r0,>4000                   ;
        jeq  deallocate_sprite_from_map_4 ; RET Z             ; Return if not set
        .push hl                        ; PUSH HL           ;
@@ -5020,7 +5024,7 @@ allocate_sprite_2:                     ; >ad64
        movb @c,*hl                     ; LD (HL),C         ; Record sprite index in table
 allocate_sprite_3:                     ; >ad75
        .pop ix                         ; POP IX            ; IX now holds sprite address
-       movb @zero,@>07(ix)             ; LD (IX+$07),$00   ; Init sprite
+       movb @zero,@>06(ix)             ; LD (IX+$07),$00   ; Init sprite
        movb @zero,@>03(ix)             ; LD (IX+$03),$00   ; Set counter to 0
        movb @b255,@>04(ix)             ; LD (IX+$04),$FF   ; Set loaded pattern index to none
        movb @bytes+>f8,@>08(ix)        ; LD (IX+$08),$F8   ; Set y

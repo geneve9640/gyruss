@@ -569,6 +569,46 @@ ti_quit:
        blwp @>0000
 *// ti_check_quit
 
+***************************************************************************
+*
+* Check pause
+*
+ti_check_pause:
+       .proc
+       li   r0,KEY_P
+       bl   @ti_check_key
+       jeq  ti_check_pause_6
+       bl   @ti_mute_sound
+       bl   @ti_wait_vsync
+ti_check_pause_1:
+       bl   @ti_wait_vsync
+       li   r0,KEY_P
+       bl   @ti_check_key
+       jne  ti_check_pause_1
+       li   r2,30
+ti_check_pause_2:
+       bl   @ti_wait_vsync
+       dec  r2
+       jne  ti_check_pause_2
+ti_check_pause_3:
+       li   r0,KEY_P
+       bl   @ti_check_key
+       jeq  ti_check_pause_3
+       bl   @ti_wait_vsync
+ti_check_pause_4:
+       bl   @ti_wait_vsync
+       li   r0,KEY_P
+       bl   @ti_check_key
+       jne  ti_check_pause_4
+       li   r2,30
+ti_check_pause_5:
+       bl   @wait_int_play_sound
+       dec  r2
+       jne  ti_check_pause_5
+ti_check_pause_6:
+       .endproc
+*// ti_check_pause
+
 ;*********************************************************************
 ;*
 ;* Scan keyboard
@@ -585,6 +625,23 @@ ti_quit:
 ;       movb @kscan_key,a
 ;!      .endproc
 ;*// ti_keyscan
+
+*********************************************************************
+*
+* Mute sound
+*
+ti_mute_sound:
+       li   r0,mute_table              ; Mute all
+       li   r2,4
+mute_sound_1:
+       movb *r0+,@sound
+       dec  r2
+       jne  mute_sound_1
+       rt
+mute_table:
+       byte >9f, >bf, >df, >ff
+*// ti_mute_sound
+
 
 ;*********************************************************************
 ;*
@@ -642,23 +699,23 @@ ti_check_vsync:
 *
 * CPU space clear
 *
-ti_clear:
-       mov  hl,r0
-       andi r0,1
-       jeq  ti_clear_1
-       movb r0,*hl+
-       dec  bc
-       mov  bc,r0
-       srl  bc,1
-ti_clear_1:
-       clr  *hl+
-       dec  bc
-       jne  ti_clear_1
-       andi r0,1
-       jeq  ti_clear_2
-       movb r0,*hl+
-ti_clear_2:
-       rt
+;ti_clear:
+;       mov  hl,r0
+;       andi r0,1
+;       jeq  ti_clear_1
+;       movb r0,*hl+
+;       dec  bc
+;       mov  bc,r0
+;       srl  bc,1
+;ti_clear_1:
+;       clr  *hl+
+;       dec  bc
+;       jne  ti_clear_1
+;       andi r0,1
+;       jeq  ti_clear_2
+;       movb r0,*hl+
+;ti_clear_2:
+;       rt
 *// ti_clear
 
 ;*********************************************************************
