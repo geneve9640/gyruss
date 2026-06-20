@@ -1,6 +1,6 @@
 # Gyruss
 
-For the TI-99/4A home computer.
+This fork is specifically for the Geneve 9640 computer
 
 Ported in 2026 from the Colecovision version by Rasmus Moustgaard <rasmus.moustgaard@gmail.com>. 
 
