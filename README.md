@@ -25,7 +25,10 @@ Ported in 2026 from the Colecovision version by Rasmus Moustgaard <rasmus.moustg
 ## Playing the game
 
 Joystick only
+
 SPACE - pause
+
 ESCape - quits the game
+
 You can activate two-player mode by starting the game by pressing the fire button on joystick 2. 
 
