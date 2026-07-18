@@ -1,3 +1,7 @@
+; 7.18.2026, changed VDP status read to CRU-based test for Geneve
+; On real hardware (mine) this smooths out the music and gameplay tempo.
+; Due to game speed, consider enabling the memory wait states at future date.
+;
 * Entry point
 entry:                                 ; >8024
        ;li   sp,stack                   ; LD SP,$73BA       ; Init stack pointer
@@ -797,10 +801,31 @@ clear_rows_9_and_14:                   ; >84ed
 ;       .pop ix                         ; POP IX            ;
 ;       .ret                            ; RETN              ;
 
+
+;----9938 cru-based interrupt test
+; if there is an int at this time, play sound. 
+; if there isn't an int, pass through.
+; Do not read vdp status if there was no interrupt
+;
 play_sound_if_int:
-       movb @vdpsta,r0
-       jlt  play_sound_if_int_1
-       rt
+      mov  r12,r0
+      clr  r12
+      tb   2
+      jne  playthesound
+      mov  r0,r12
+      rt
+
+playthesound:
+      movb @vdpsta,r12
+      mov  r0,r12
+;end 9938 test-------------
+
+; original status-based interrupt test
+;play_sound_if_int:
+;       movb @vdpsta,r0
+;       jlt  play_sound_if_int_1
+;       rt
+
 play_sound_if_int_1:
        .proc
        bl   @sound_player
@@ -813,10 +838,29 @@ wait_2_int_play_sound:
        jeq   wait_int_play_sound
        clr   @int_counter
        rt
+
+
+;--------------------9938 cru-based interrupt test #2
+; 6/17/2026 based on JasonACT's comments AtariAge forum
+; see also play_sound_if_int preceding this routine
+; 
 wait_int_play_sound:
-       movb @vdpsta,r0
-       jlt  wait_int_play_sound_1
-       jmp  wait_int_play_sound
+      mov  r12,r0       ;save R12
+      clr  r12
+!     tb   2            ;wait until interrupt
+      jeq  -!
+      mov  r0,r12       ;restore R12
+      movb @vdpsta,r0   ;read status
+;----end 9938 cru test
+
+
+; original status-based interrupt test
+;wait_int_play_sound:
+;       movb @vdpsta,r0
+;       jlt  wait_int_play_sound_1
+;       jmp  wait_int_play_sound
+;
+
 wait_int_play_sound_1:
        .proc
        bl   @sound_player

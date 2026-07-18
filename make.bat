@@ -1,10 +1,13 @@
-xas99.py -i -q -R -L gyruss.lst -E symbols.txt src/gyruss.a99 -o bin/gyruss
+del bin\GYRUSS*.*
 
-java -jar tools/ea5tocart.jar bin\gyruss "GYRUSS"
+xas99.py -i -q -R -L gyruss.lst -E symbols.txt src/gyruss.a99 -o bin/GYRUSS.BIN
 
-copy bin\gyruss8.bin .
+REM copy as TIFILES format
+xdm99.py -T bin\GYRUSS.BIN -n GYRUSS1 -o TIFILES\GYRUSS1
+xdm99.py -T bin\GYRUSS.BIO -n GYRUSS2 -o TIFILES\GYRUSS2
+xdm99.py -T bin\GYRUSS.BIP -n GYRUSS3 -o TIFILES\GYRUSS3
+xdm99.py -T bin\GYRUSS.BIQ -n GYRUSS4 -o TIFILES\GYRUSS4
 
-xdm99.py gyruss.dsk -X dssd -n GYRUSS
-xdm99.py gyruss.dsk -a bin/gyruss bin/gyrust bin/gyrusu bin/gyrusv
-xdm99.py gyruss.dsk -t -a disk/LOAD
+REM copy to TIPI target for testing
+copy GYRUSS? t:\gyr\*.* /y
 

@@ -1,3 +1,7 @@
+; 7.4.2026, Geneve version utilizing special EXEC loader
+;           Uses >0038 routine for QUIT and KEY
+; 7.18.2026 Removed gyruss' quit function; loader handles it internally; 
+;
 *********************************************************************
 *
 * Setup environment
@@ -516,14 +520,21 @@ JOY_RT EQU  >060A
 JOY_DN EQU  >060C
 JOY_UP EQU  >060E
 *
-ti_check_key:
-       li   r12,>0024                  ; CRU address of the column decoder
-       ldcr r0,3                       ; Select column
-       andi r0,>00ff
-       mov  r0,r12                     ; Select row
-       tb   0                          ; Test key, EQ if not pressed
-       rt
-*// ti_check_key
+;=====================================================================
+; Geneve equate for 9901 cru-matrix emulation, Rasmus style return.
+; Requires special loader
+;
+ti_check_key  equ >0038    ;bl @check_key
+
+
+;;ti_check_key:
+;       li   r12,>0024                  ; CRU address of the column decoder
+;       ldcr r0,3                       ; Select column
+;       andi r0,>00ff
+;       mov  r0,r12                     ; Select row
+;       tb   0                          ; Test key, EQ if not pressed
+;      rt
+;*// ti_check_key
 
 ***************************************************************************
 *
@@ -552,22 +563,49 @@ ti_check_key:
 *
 * Check quit
 *
+
+; The Geneve loader treats the ESCape key as quit. Since the startup screen and
+; gameplay use the >0038 routine for keyboard/joystick, we don't need to check 
+; again. Simply return to caller. 
+;
 ti_check_quit:
-       clr  r1                         ; Test column 0
-       li   r12,>0024                  ; Address for column selection
-       ldcr r1,3                       ; Select column
-       li   r12,>0006                  ; Address to read rows
-       stcr r1,8
-       andi r1,>1100
-       jeq  ti_quit
-*      Return
        rt
-*      Quit
-ti_quit:
-       clr  @>83c4                     ; Reset user ISR address
-       seto @>6000                     ; Select first ROM bank
-       blwp @>0000
-*// ti_check_quit
+
+; Geneve quit routine; save registers before calling
+;genquit    data 0
+;genquitr11 data 0
+;ti_check_quit:
+;       mov  r0,@genquit
+;       mov  r11,@genquitr11
+;       li   r0,>0416  ;Geneve cru-matrix extension; ESCape key
+;       bl   @ti_check_key
+;       jne  geneve_quit
+;       mov  @genquit,r0
+;       mov  @genquitr11,r11
+;       rt
+;
+;geneve_quit:
+;       clr  @>83c4
+;       blwp @0
+;---------------end Geneve quit check
+
+; original quit routine for /4a
+;ti_check_quit:
+;;       clr  r1                         ; Test column 0
+;;       li   r12,>0024                  ; Address for column selection
+;;       ldcr r1,3                       ; Select column
+;;       li   r12,>0006                  ; Address to read rows
+;;       stcr r1,8
+;;       andi r1,>1100
+;;       jeq  ti_quit
+;;*      Return
+;;       rt
+;;*      Quit
+;;ti_quit:
+;;       clr  @>83c4                     ; Reset user ISR address
+;;       seto @>6000                     ; Select first ROM bank
+;;       blwp @>0000
+;;*// ti_check_quit
 
 ***************************************************************************
 *
